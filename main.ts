@@ -1,20 +1,34 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { 
+	App, 
+	Editor, 
+	MarkdownView, 
+	Modal, 
+	Notice, 
+	Plugin, 
+	PluginSettingTab, 
+	Setting
+} from 'obsidian';
+import { initOpenAI, generateAndStoreEmbeddings } from './src/semantic-search';
+import { VectorStore, LocalVectorDict, StoredVector } from './src/vector-storage';
 
-// Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
-	mySetting: string;
+	openaiAPIKey: string;
+	vectors: Array<StoredVector>;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+	openaiAPIKey: '',
+	vectors: [],
 }
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
+	vectorStore: VectorStore;
 
 	async onload() {
 		await this.loadSettings();
+		this.vectorStore = new VectorStore(this);
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
@@ -28,42 +42,64 @@ export default class MyPlugin extends Plugin {
 		const statusBarItemEl = this.addStatusBarItem();
 		statusBarItemEl.setText('Status Bar Text');
 
-		// This adds a simple command that can be triggered anywhere
+		// Generate embeddings
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+			id: 'generate-embeddings',
+			name: 'Generate embeddings of current note',
+			callback: async () => {
+				const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (activeView) {
+					const editor = activeView.editor;
+					const text = editor.getValue();
+					
+					const linktext = this.activeFileLinkText();
+					if (!linktext) { return; }
+					
+					generateAndStoreEmbeddings({
+						vectorStore: this.vectorStore,
+						docs: [text], 
+						linktext
+					});
 				}
 			}
 		});
+
+		// This adds a simple command that can be triggered anywhere
+		this.addCommand({
+			id: 'open-semantic-search-modal',
+			name: 'Semantic Search',
+			callback: () => {
+				new SemanticSearchModal(this.app, this).open();
+			}
+		});
+		// This adds an editor command that can perform some operation on the current editor instance
+		// this.addCommand({
+		// 	id: 'sample-editor-command',
+		// 	name: 'Sample editor command',
+		// 	editorCallback: (editor: Editor, view: MarkdownView) => {
+		// 		console.log(editor.getSelection());
+		// 		editor.replaceSelection('Sample Editor Command');
+		// 	}
+		// });
+		// This adds a complex command that can check whether the current state of the app allows execution of the command
+		// this.addCommand({
+		// 	id: 'open-sample-modal-complex',
+		// 	name: 'Open sample modal (complex)',
+		// 	checkCallback: (checking: boolean) => {
+		// 		// Conditions to check
+		// 		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		// 		if (markdownView) {
+		// 			// If checking is true, we're simply "checking" if the command can be run.
+		// 			// If checking is false, then we want to actually perform the operation.
+		// 			if (!checking) {
+		// 				new SampleModal(this.app).open();
+		// 			}
+
+		// 			// This command will only show up in Command Palette when the check function returns true
+		// 			return true;
+		// 		}
+		// 	}
+		// });
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -84,21 +120,48 @@ export default class MyPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// this.clearVectorSettings();
+		initOpenAI(this.settings.openaiAPIKey);
+	}
+
+	clearVectorSettings() {
+		this.settings.vectors = [];
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+
+	activeFileLinkText(): string | null {
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			console.log('no active file');
+			return null;
+		}
+		return this.app.metadataCache.fileToLinktext(activeFile, activeFile.path);
+	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
+class SemanticSearchModal extends Modal {
+	plugin: MyPlugin;
+
+	constructor(app: App, plugin: MyPlugin) {
 		super(app);
+		this.plugin = plugin;
 	}
 
 	onOpen() {
 		const {contentEl} = this;
-		contentEl.setText('Woah!');
+		
+		const linktext = this.plugin.activeFileLinkText();
+		if (!linktext) {
+			contentEl.setText('No active file');
+			return;
+		}
+		const topMatches = this.plugin.vectorStore.findTopMatches(linktext, 3);
+		console.log(topMatches);
+		
+		contentEl.setText('Top matches:<p />' + topMatches.map((match) => '[[' + match.storedVector.linktext + ']]').join('<p />'));
 	}
 
 	onClose() {
@@ -123,14 +186,13 @@ class SampleSettingTab extends PluginSettingTab {
 		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
 
 		new Setting(containerEl)
-			.setName('Setting #1')
+			.setName('OpenAI API Key')
 			.setDesc('It\'s a secret')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('Enter your API key')
+				.setValue(this.plugin.settings.openaiAPIKey)
 				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.openaiAPIKey = value;
 					await this.plugin.saveSettings();
 				}));
 	}
