@@ -1,3 +1,4 @@
+import { TFile, App } from 'obsidian';
 import { Configuration, OpenAIApi } from 'openai';
 import { SHA256, enc } from 'crypto-js';
 import { VectorStore } from './vector_storage';
@@ -24,7 +25,6 @@ export const generateOpenAiEmbeddings = async (docs: Array<string>) => {
     input: docs,
     model: "text-embedding-ada-002",
   });
-  console.log(embeddings);
   return embeddings.data.data.map((entry: any) => entry.embedding)[0];
 };
 
@@ -49,16 +49,17 @@ export const filterOutMetaData = (text: string) => {
   return filteredLines.join('\n');
 };
 
-export const generateAndStoreEmbeddings = async ({ vectorStore, docs, linktext, path }: { vectorStore: VectorStore, docs: Array<string>, linktext: string, path: string }) => {
-  docs.forEach(async (text: string) => {
-    const filteredLines = filterOutMetaData(text);
+export const generateAndStoreEmbeddings = async ({ files, app, vectorStore }: { files: Array<TFile>, app: App, vectorStore: VectorStore }): Promise<any> => {
+  console.log("Generating embeddings for " + files.length + " files...");
+  return Promise.all(files.map(async (file: TFile) => {
+    const linktext = app.metadataCache.fileToLinktext(file, file.path)
+    const path = file.path;
+    const filteredLines = filterOutMetaData(await app.vault.cachedRead(file));
     if (filteredLines.length === 0) {
       console.error("Error extracting text for [[" + linktext + "]]");
       return;
     }
     const sha = enc.Base64.stringify(SHA256(filteredLines));
-    console.log("vectorStore: ", vectorStore)
-
     if (vectorStore.vectorExists(sha)) {
       console.error("Vector already exists for [[" + linktext + "]]");
       return;
@@ -66,7 +67,7 @@ export const generateAndStoreEmbeddings = async ({ vectorStore, docs, linktext, 
     
     const embedding = await generateOpenAiEmbeddings([filteredLines]);
     vectorStore.saveVector({ linktext, embedding, sha, path });
-  });
+  }));
 };
 
 // export const findTopMatches = ({ vectorStore, linktext }: { vectorStore: VectorStore, linktext: string}) => {

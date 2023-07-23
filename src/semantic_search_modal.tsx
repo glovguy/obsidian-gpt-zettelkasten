@@ -16,8 +16,6 @@ export default class SemanticSearchModal extends Modal {
 	async onOpen() {
 		const {contentEl} = this;
     const root = createRoot(contentEl.appendChild(document.createElement('div')));
-    
-		console.log("in modal", this, contentEl);
 		
 		const activeFileInfo = this.plugin.activeFileLinkText();
 		if (!activeFileInfo) {
@@ -26,7 +24,6 @@ export default class SemanticSearchModal extends Modal {
 		}
 		const { linktext, path } = activeFileInfo;
 		const topMatches = this.plugin.vectorStore.findTopMatches(linktext, 3);
-		console.log("topMatches: ", topMatches);
 
 		await Promise.all(topMatches.map(async (match) => {
 			let existingFile = this.app.vault.getAbstractFileByPath(match.storedVector.path);

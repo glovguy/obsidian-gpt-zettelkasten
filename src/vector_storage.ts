@@ -32,7 +32,6 @@ export class VectorStore {
     this.vectors.set(vector.linktext, vector);
     this.vectorShas.add(vector.sha);
     this.plugin.settings.vectors.push(vector);
-    console.log("VECTORSSS: ", this.vectors, this.plugin.settings.vectors);
     this.plugin.saveSettings();
   }
 
