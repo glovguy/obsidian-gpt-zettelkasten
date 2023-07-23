@@ -50,7 +50,7 @@ export class VectorStore {
     return dotProduct / (magnitudeA * magnitudeB);
   }
 
-  vectorSearch(queryEmbedding: StoredVector, n: number = 1): VectorSearchResult[] {
+  vectorSearch(queryEmbedding: StoredVector): VectorSearchResult[] {
     const results: VectorSearchResult[] = [];
 
     this.vectors.forEach((storedVector) => {
@@ -59,14 +59,16 @@ export class VectorStore {
       results.push({ storedVector, similarity: cosineSim });
     });
 
-    return results.sort((a, b) => b.similarity - a.similarity).slice(0, n);
+    return results.sort((a, b) => b.similarity - a.similarity); 
+    // be sure to slice the results to the top n results
+    // .slice(0, n);
   }
 
-  findTopMatches(linktext: string, n: number = 1): VectorSearchResult[] {
+  findTopMatches(linktext: string): VectorSearchResult[] {
     const storedVector = this.getVector(linktext);
     if (!storedVector) {
       throw new Error("Vector not found");
     }
-    return this.vectorSearch(storedVector, n);
+    return this.vectorSearch(storedVector);
   };
 }
