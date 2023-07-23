@@ -1,6 +1,6 @@
 import { Configuration, OpenAIApi } from 'openai';
 import { SHA256, enc } from 'crypto-js';
-import { VectorStore } from './vector-storage';
+import { VectorStore } from './vector_storage';
 
 
 // rename to embeddings module? vector storage is doing the searching
@@ -28,7 +28,7 @@ export const generateOpenAiEmbeddings = async (docs: Array<string>) => {
   return embeddings.data.data.map((entry: any) => entry.embedding)[0];
 };
 
-const filterOutMetaData = (text: string) => {
+export const filterOutMetaData = (text: string) => {
   const bodyMarker = "## ";
   let currentDepth = 2;
   let recording = true;
@@ -49,7 +49,7 @@ const filterOutMetaData = (text: string) => {
   return filteredLines.join('\n');
 };
 
-export const generateAndStoreEmbeddings = async ({ vectorStore, docs, linktext }: { vectorStore: VectorStore, docs: Array<string>, linktext: string }) => {
+export const generateAndStoreEmbeddings = async ({ vectorStore, docs, linktext, path }: { vectorStore: VectorStore, docs: Array<string>, linktext: string, path: string }) => {
   docs.forEach(async (text: string) => {
     const filteredLines = filterOutMetaData(text);
     if (filteredLines.length === 0) {
@@ -65,7 +65,7 @@ export const generateAndStoreEmbeddings = async ({ vectorStore, docs, linktext }
     }
     
     const embedding = await generateOpenAiEmbeddings([filteredLines]);
-    vectorStore.saveVector({ linktext, embedding, sha });
+    vectorStore.saveVector({ linktext, embedding, sha, path });
   });
 };
 

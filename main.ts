@@ -8,8 +8,9 @@ import {
 	PluginSettingTab, 
 	Setting
 } from 'obsidian';
-import { initOpenAI, generateAndStoreEmbeddings } from './src/semantic-search';
-import { VectorStore, LocalVectorDict, StoredVector } from './src/vector-storage';
+import { initOpenAI, generateAndStoreEmbeddings } from './src/semantic_search';
+import { VectorStore, LocalVectorDict, StoredVector } from './src/vector_storage';
+import SemanticSearchModal from './src/semantic_search_modal';
 
 
 interface MyPluginSettings {
@@ -52,13 +53,14 @@ export default class MyPlugin extends Plugin {
 					const editor = activeView.editor;
 					const text = editor.getValue();
 					
-					const linktext = this.activeFileLinkText();
-					if (!linktext) { return; }
-					
+					const activeFileLinks = this.activeFileLinkText();
+					if (!activeFileLinks) { return; }
+					const { linktext, path } = activeFileLinks;
 					generateAndStoreEmbeddings({
 						vectorStore: this.vectorStore,
 						docs: [text], 
-						linktext
+						linktext,
+						path
 					});
 				}
 			}
@@ -132,41 +134,16 @@ export default class MyPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	activeFileLinkText(): string | null {
+	activeFileLinkText(): { linktext: string, path: string } | null {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
 			console.log('no active file');
 			return null;
 		}
-		return this.app.metadataCache.fileToLinktext(activeFile, activeFile.path);
-	}
-}
-
-class SemanticSearchModal extends Modal {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app);
-		this.plugin = plugin;
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		
-		const linktext = this.plugin.activeFileLinkText();
-		if (!linktext) {
-			contentEl.setText('No active file');
-			return;
-		}
-		const topMatches = this.plugin.vectorStore.findTopMatches(linktext, 3);
-		console.log(topMatches);
-		
-		contentEl.setText('Top matches:<p />' + topMatches.map((match) => '[[' + match.storedVector.linktext + ']]').join('<p />'));
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+		return {
+			linktext: this.app.metadataCache.fileToLinktext(activeFile, activeFile.path),
+			path: activeFile.path
+		};
 	}
 }
 

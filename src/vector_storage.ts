@@ -3,6 +3,7 @@ import MyPlugin from 'main';
 
 export interface StoredVector {
 	linktext: string;
+  path: string;
 	embedding: Array<number>;
 	sha: string;
 }
@@ -10,6 +11,7 @@ export interface StoredVector {
 export interface VectorSearchResult {
   storedVector: StoredVector;
   similarity: number;
+  content?: string;
 };
 
 export type LocalVectorDict = Map<string, StoredVector>;
@@ -66,6 +68,6 @@ export class VectorStore {
     if (!storedVector) {
       throw new Error("Vector not found");
     }
-    return this.vectorSearch(storedVector);
+    return this.vectorSearch(storedVector, n);
   };
 }
