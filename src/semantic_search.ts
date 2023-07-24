@@ -1,8 +1,8 @@
-import { TFile, App } from 'obsidian';
+import { TFile, App, Notice } from 'obsidian';
 import { Configuration, OpenAIApi } from 'openai';
-import { SHA256, enc } from 'crypto-js';
-import { VectorStore } from './vector_storage';
 
+import { VectorStore } from './vector_storage';
+import { shaForString } from './utils';
 
 // rename to embeddings module? vector storage is doing the searching
 // maybe vectorStore should initialize and delegate to this module?
@@ -50,7 +50,7 @@ export const filterOutMetaData = (text: string) => {
 };
 
 export const generateAndStoreEmbeddings = async ({ files, app, vectorStore }: { files: Array<TFile>, app: App, vectorStore: VectorStore }): Promise<any> => {
-  console.log("Generating embeddings for " + files.length + " files...");
+  console.log(`Generating embeddings for ${files.length} files...`);
   return Promise.all(files.map(async (file: TFile) => {
     const linktext = app.metadataCache.fileToLinktext(file, file.path)
     const path = file.path;
@@ -59,8 +59,14 @@ export const generateAndStoreEmbeddings = async ({ files, app, vectorStore }: { 
       console.error("Error extracting text for [[" + linktext + "]]");
       return;
     }
-    const sha = enc.Base64.stringify(SHA256(filteredLines));
-    if (vectorStore.vectorExists(sha)) {
+    const sha = shaForString(filteredLines);
+    if (vectorStore.vectorExists(sha) && !vectorStore.getVector(linktext)) {
+      // console.error("Vector already exists for [[" + linktext + "]], but was renamed. Fixing...");
+      new Notice(`Vector already exists for [[${linktext}]], but was renamed. Fixing...`);
+      vectorStore.renameVector({ sha, newLinktext: linktext });
+      return;
+    }
+    if (vectorStore.vectorExists(sha) && vectorStore.getVector(linktext)) {
       console.error("Vector already exists for [[" + linktext + "]]");
       return;
     }
@@ -70,13 +76,10 @@ export const generateAndStoreEmbeddings = async ({ files, app, vectorStore }: { 
   }));
 };
 
-// export const findTopMatches = ({ vectorStore, linktext }: { vectorStore: VectorStore, linktext: string}) => {
-//   const storedVector = vectorStore.getVector(linktext);
-//   if (!storedVector) {
-//     throw new Error("Vector not found");
-//   }
-//   return vectorStore.vectorSearch(storedVector);
-// };
+export const shaForFile = async (file: TFile): Promise<string> => {
+  const filteredLines = filterOutMetaData(await app.vault.cachedRead(file));
+  return shaForString(filteredLines);
+};
 
 // const chatCompletion = await openai.createChatCompletion({
 //   model: "gpt-3.5-turbo",

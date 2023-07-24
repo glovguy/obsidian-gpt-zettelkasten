@@ -1,11 +1,11 @@
 {
-	"id": "obsidian-gpt-zettelkasten",
-	"name": "GPT Zettelkasten Tools",
+	"id": "obsidian-zettelkasten-llm-tools",
+	"name": "LLM Zettelkasten Tools",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Using transformers to aid Zettelkasten note taking in Obsidian",
+	"description": "Using LLMs to aid Zettelkasten note taking in Obsidian",
 	"author": "Karl Smith",
 	"authorUrl": "https://karl.pizza",
-	"fundingUrl": "https://karl.pizza",
+	"fundingUrl": "https://bmc.link/karl.pizza",
 	"isDesktopOnly": false
 }

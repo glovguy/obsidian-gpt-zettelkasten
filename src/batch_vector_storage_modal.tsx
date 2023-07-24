@@ -36,10 +36,8 @@ const BatchSetup = ({ plugin }: { plugin: MyPlugin}) => {
   const [allowPattern, setAllowPattern] = useState(plugin.settings.allowPattern || '');
   const [disallowPattern, setDisallowPattern] = useState(plugin.settings.disallowPattern || '');
   const filterFiles = (allowPttrn: string, disallowPttrn: string) => {
-    console.log("running filterFiles")
     const allowGroups = allowPttrn.toLowerCase().split(',').filter((s) => s.length > 0).map((s) => s.split('*').filter((s) => s.length > 0));
     const disallowSubStrings = disallowPttrn.toLowerCase().split('*').filter((s) => s.length > 0);
-    console.log(allowGroups, disallowSubStrings);
     return plugin.app.vault.getFiles().filter((file) => {
       const path = file.path.toLowerCase();
 

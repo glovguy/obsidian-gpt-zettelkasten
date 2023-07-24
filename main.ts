@@ -6,7 +6,8 @@ import {
 	Notice, 
 	Plugin, 
 	PluginSettingTab, 
-	Setting
+	Setting,
+	TFile
 } from 'obsidian';
 import { initOpenAI, generateAndStoreEmbeddings } from './src/semantic_search';
 import { VectorStore, LocalVectorDict, StoredVector } from './src/vector_storage';
@@ -139,17 +140,10 @@ export default class MyPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	// getActiveFile(): string | null {
-
-	activeFileLinkText(): { linktext: string, path: string } | null {
-		const activeFile = this.app.workspace.getActiveFile();
-		if (!activeFile) {
-			console.error('no active file');
-			return null;
-		}
+	linkTextForFile(file: TFile): { linktext: string, path: string } {
 		return {
-			linktext: this.app.metadataCache.fileToLinktext(activeFile, activeFile.path),
-			path: activeFile.path
+			linktext: this.app.metadataCache.fileToLinktext(file, file.path),
+			path: file.path
 		};
 	}
 }
