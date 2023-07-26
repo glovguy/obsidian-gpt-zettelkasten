@@ -2,7 +2,7 @@
 
 # Zettelkasten LLM Tools
 
-Zettelkasten-style note in Obsidian taking powered by Large Language Models.
+Zettelkasten note taking powered by Large Language Models.
 
 ## Features
 
