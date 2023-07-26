@@ -1,4 +1,5 @@
 ![Zettelkasten LLM Tools Logo](NoteRobot.png "Zettelkasten LLM Tools")
+<img src="NoteRobot.png" alt="Zettelkasten LLM Tools Logo" width="200" height="200" style="border: 4px;" />
 
 # Zettelkasten LLM Tools
 
