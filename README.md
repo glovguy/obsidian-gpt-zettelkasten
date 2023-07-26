@@ -1,4 +1,4 @@
-<img src="NoteRobot.png" alt="Zettelkasten LLM Tools Logo" width="200" height="200" style="border: 16px;" />
+<img src="NoteRobot.png" alt="Zettelkasten LLM Tools Logo" width="200" height="200" style="border-radius: 16px;" />
 
 # Zettelkasten LLM Tools
 
