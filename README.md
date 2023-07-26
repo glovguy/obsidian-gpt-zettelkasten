@@ -1,8 +1,10 @@
+![Zettelkasten LLM Tools Logo](NoteRobot.png "Zettelkasten LLM Tools")
+
 # Zettelkasten LLM Tools
 
-This plugin provides functionality from Large Language Models to aid in Zettelkasten-style note taking.
+Zettelkasten-style note in Obsidian taking powered by Large Language Models.
 
-Features
+## Features
 
 - Generate embeddings and index current note
 - Semantic Search for notes similar to current note
