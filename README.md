@@ -2,8 +2,6 @@
 
 This plugin provides functionality from Large Language Models to aid in Zettelkasten-style note taking.
 
-## First time developing plugins?
-
 Features
 
 - Generate embeddings and index current note
