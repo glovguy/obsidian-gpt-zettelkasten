@@ -1,7 +1,7 @@
 import { TFile } from 'obsidian';
-import MyPlugin from 'main';
+import ZettelkastenLLMToolsPlugin from 'main';
 import { shaForString } from './utils';
-import { filterOutMetaData, generateOpenAiEmbeddings } from './semantic_search';
+import { generateOpenAiEmbeddings } from './semantic_search';
 
 export interface StoredVector {
 	linktext: string;
@@ -19,11 +19,11 @@ export interface VectorSearchResult {
 export type LocalVectorDict = Map<string, StoredVector>;
 
 export class VectorStore {
-  plugin: MyPlugin;
+  plugin: ZettelkastenLLMToolsPlugin;
   vectors: LocalVectorDict;
   vectorShas: Set<string>;
 
-  constructor(plugin: MyPlugin) {
+  constructor(plugin: ZettelkastenLLMToolsPlugin) {
     this.plugin = plugin;
     this.vectors = new Map(plugin.settings.vectors.map((vector: StoredVector) => [vector.linktext, vector]));
     this.vectorShas = new Set(plugin.settings.vectors.map((vector: StoredVector) => vector.sha));
@@ -72,7 +72,7 @@ export class VectorStore {
 
   async upsertVector(file: TFile): Promise<StoredVector> {
     const { linktext } = this.plugin.linkTextForFile(file);
-    const filteredLines = filterOutMetaData(await this.plugin.app.vault.cachedRead(file));
+    const filteredLines = this.plugin.fileFilter.filterOutMetaData(await this.plugin.app.vault.cachedRead(file));
     if (filteredLines.length === 0) {
       throw new Error("Error extracting text for [[" + linktext + "]]");
     }

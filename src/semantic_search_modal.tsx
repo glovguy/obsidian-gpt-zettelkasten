@@ -1,21 +1,21 @@
 import { useState, useRef, useEffect, JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Modal, App, TFile, getIcon, Notice } from 'obsidian';
-import MyPlugin from '../main';
-import { StoredVector, VectorSearchResult } from './vector_storage';
-import { filterOutMetaData } from './semantic_search';
+import ZettelkastenLLMToolsPlugin from '../main';
+import { VectorSearchResult } from './vector_storage';
+
 
 export default class SemanticSearchModal extends Modal {
-	plugin: MyPlugin;
+	plugin: ZettelkastenLLMToolsPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: ZettelkastenLLMToolsPlugin) {
 		super(app);
 		this.plugin = plugin;
 	}
 
 	async onOpen() {
 		const {contentEl} = this;
-		const activeFile = app.workspace.getActiveFile();
+		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
 			contentEl.setText('No active file');
 			return;
@@ -33,7 +33,7 @@ export default class SemanticSearchModal extends Modal {
 				return;
 			}
 
-			match['content'] = filterOutMetaData(await this.app.vault.cachedRead(existingFile));
+			match['content'] = this.plugin.fileFilter.filterOutMetaData(await this.app.vault.cachedRead(existingFile));
 		}));
 
 		contentEl.setText('');
@@ -67,11 +67,27 @@ export const Icon = ({ svg }: { svg: SVGSVGElement | null }) => {
 
 const CopyIcon = () => (<Icon svg={getIcon('copy')!} />);
 
-const SearchResults = ({ results, plugin, activeFileLinktext, modal }: { results: Array<VectorSearchResult>, plugin: MyPlugin, activeFileLinktext: string, modal: SemanticSearchModal }) => {
+const SearchResults = (
+	{ 
+		results,
+		plugin,
+		activeFileLinktext,
+		modal
+	}: { 
+		results: Array<VectorSearchResult>,
+		plugin: ZettelkastenLLMToolsPlugin,
+		activeFileLinktext: string,
+		modal: SemanticSearchModal
+	}) => {
 	const [resultShowNum, setResultShowNum] = useState(5);
 	const onClickNoteLink = (result: VectorSearchResult) => {
-		plugin.app.workspace.openLinkText(result.storedVector.linktext, '')
+		plugin.app.workspace.openLinkText(result.storedVector.linktext, '');
 		modal.close();
+	}
+
+	const copyToClipboard = (text: string) => {
+		navigator.clipboard.writeText(text)
+		new Notice('Copied to clipboard');
 	}
 
   return (
@@ -87,7 +103,7 @@ const SearchResults = ({ results, plugin, activeFileLinktext, modal }: { results
 							<a style={{ padding: "8px" }} onClick={() => onClickNoteLink(result)}>
 								{'[[' + result.storedVector.linktext + ']]'}
 							</a>
-							<button style={{ cursor: 'pointer', width: '28px', height: '28px' }} onClick={() => navigator.clipboard.writeText(result.storedVector.linktext)}><CopyIcon></CopyIcon></button>
+							<button style={{ cursor: 'pointer', width: '28px', height: '28px' }} onClick={() => copyToClipboard(result.storedVector.linktext)}><CopyIcon></CopyIcon></button>
 						</div>
 						<p style={{ padding: "8px" }}>{result.content}</p>
 					</div>

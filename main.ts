@@ -6,37 +6,37 @@ import {
 	Setting,
 	TFile
 } from 'obsidian';
-import { initOpenAI, generateAndStoreEmbeddings } from './src/semantic_search';
+import { initOpenAI, generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
 import SemanticSearchModal from './src/semantic_search_modal';
 import BatchVectorStorageModal from './src/batch_vector_storage_modal';
 
 
-interface MyPluginSettings {
+interface ZettelkastenLLMToolsPluginSettings {
 	openaiAPIKey: string;
 	vectors: Array<StoredVector>;
 	allowPattern: string;
 	disallowPattern: string;
+	contentMarker: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
 	openaiAPIKey: '',
 	vectors: [],
 	allowPattern: '.*',
-	disallowPattern: ''
+	disallowPattern: '',
+	contentMarker: '',
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class ZettelkastenLLMToolsPlugin extends Plugin {
+	settings: ZettelkastenLLMToolsPluginSettings;
 	vectorStore: VectorStore;
+	fileFilter: FileFilter;
 
 	async onload() {
+		this.fileFilter = new FileFilter();
 		await this.loadSettings();
 		this.vectorStore = new VectorStore(this);
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		// const statusBarItemEl = this.addStatusBarItem();
-		// statusBarItemEl.setText('Status Bar Text');
 
 		// Generate embeddings for current note command
 		this.addCommand({
@@ -53,6 +53,7 @@ export default class MyPlugin extends Plugin {
 					
 					generateAndStoreEmbeddings({
 						vectorStore: this.vectorStore,
+						fileFilter: this.fileFilter,
 						files: [activeFile],
 						app: this.app,
 					});
@@ -78,8 +79,7 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new ZettelkastenLLMToolsPluginSettingTab(this.app, this));
 	}
 
 	onunload() {
@@ -90,6 +90,7 @@ export default class MyPlugin extends Plugin {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 		// this.clearVectorSettings();
 		initOpenAI(this.settings.openaiAPIKey);
+		this.fileFilter.contentMarker = this.settings.contentMarker;
 	}
 
 	clearVectorSettings() {
@@ -108,12 +109,16 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
+	plugin: ZettelkastenLLMToolsPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: ZettelkastenLLMToolsPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	hide(): void {
+		this.plugin.loadSettings();
 	}
 
 	display(): void {
@@ -121,16 +126,27 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+		containerEl.createEl('h2', {text: 'Settings for Zettelkasten LLM Tools Plugin.'});
 
 		new Setting(containerEl)
 			.setName('OpenAI API Key')
-			.setDesc('It\'s a secret')
+			.setDesc('Paste your OpenAI API key here.')
 			.addText(text => text
 				.setPlaceholder('Enter your API key')
 				.setValue(this.plugin.settings.openaiAPIKey)
 				.onChange(async (value) => {
 					this.plugin.settings.openaiAPIKey = value;
+					await this.plugin.saveSettings();
+				}));
+		
+		new Setting(containerEl)
+			.setName('Content marker')
+			.setDesc('Enter the markdown heading that marks the start of the content you want to use for semantic search. Leave blank to use the entire note.')
+			.addText(text => text
+				.setPlaceholder('# Body')
+				.setValue(this.plugin.settings.contentMarker)
+				.onChange(async (value) => {
+					this.plugin.settings.contentMarker = value;
 					await this.plugin.saveSettings();
 				}));
 	}

@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Modal, App, TFile } from 'obsidian';
-import MyPlugin from '../main';
+import { Modal, App, Notice } from 'obsidian';
+import ZettelkastenLLMToolsPlugin from '../main';
 import { generateAndStoreEmbeddings } from './semantic_search';
 
 
 export default class BatchVectorStorageModal extends Modal {
-	plugin: MyPlugin;
+	plugin: ZettelkastenLLMToolsPlugin;
   allowPattern: string;
   disallowPattern: string;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: ZettelkastenLLMToolsPlugin) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -18,7 +18,7 @@ export default class BatchVectorStorageModal extends Modal {
 	async onOpen() {
 		const {contentEl} = this;
     const root = createRoot(contentEl.appendChild(document.createElement('div')));
-		root.render(<BatchSetup plugin={this.plugin} />);
+		root.render(<BatchSetup plugin={this.plugin} modal={this} />);
 	}
 
 	onClose() {
@@ -32,7 +32,7 @@ const bannedChars = [
   '+', '?', '!', '|', '$', '.', '!', 
   ':', '<', '>', '&', '%', '#'
 ];
-const BatchSetup = ({ plugin }: { plugin: MyPlugin}) => {
+const BatchSetup = ({ plugin, modal }: { plugin: ZettelkastenLLMToolsPlugin, modal: BatchVectorStorageModal }) => {
   const [allowPattern, setAllowPattern] = useState(plugin.settings.allowPattern || '');
   const [disallowPattern, setDisallowPattern] = useState(plugin.settings.disallowPattern || '');
   const filterFiles = (allowPttrn: string, disallowPttrn: string) => {
@@ -80,12 +80,18 @@ const BatchSetup = ({ plugin }: { plugin: MyPlugin}) => {
     setFilteredFiles(filterFiles(allowPattern, filteredValue));
   };
 
+  const enqueueEmbeddings = () => {
+    generateAndStoreEmbeddings({ files: filteredFiles, app: plugin.app, vectorStore: plugin.vectorStore, fileFilter: plugin.fileFilter });
+    new Notice(`Enqueued ${filteredFiles.length} files for embedding`);
+    modal.close();
+  };
+
   return (
     <div>
 			<h1>Set up batch embedding</h1>
 			<span>Allow pattern: <input value={allowPattern} onChange={onAllowPatternChange}></input></span><p />
       <span>Disallow pattern: <input value={disallowPattern} onChange={onDisallowPatternChange} ></input></span><p />
-      <button onClick={() => generateAndStoreEmbeddings({ files: filteredFiles, app: plugin.app, vectorStore: plugin.vectorStore })}>Start batch embedding</button>
+      <button onClick={enqueueEmbeddings}>Start batch embedding</button>
       <div>
         <h3>Preview</h3>
         <span>{filteredFiles.length} files match pattern</span>
