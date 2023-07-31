@@ -96,7 +96,7 @@ const BatchSetup = ({ plugin, modal }: { plugin: ZettelkastenLLMToolsPlugin, mod
         <h3>Preview</h3>
         <span>{filteredFiles.length} files match pattern</span>
         {filteredFiles.map((file) => (
-          <div key={file.path} style={{ padding: "4px", margin: "4px" }}>
+          <div key={file.path} className="batch-embedding-matching-file-preview-container" >
             <a onClick={() => plugin.app.workspace.openLinkText('', file.path)}><code>{file.path}</code></a>
           </div>
         ))}

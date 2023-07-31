@@ -94,23 +94,23 @@ const SearchResults = (
     <div>
 			<h1>Results</h1>
 			<span>Notes similar to {"[[" + activeFileLinktext + "]]"}</span><p />
-			<span style={{ fontSize: '12px' }}>Searched {plugin.vectorStore.numVectors()} entries</span><p /><p />
+			<span className="search-results-search-count-subheader" >Searched {plugin.vectorStore.numVectors()} entries</span><p /><p />
       {results.slice(0, resultShowNum).map((result) => {
 				if (!result.content) { return; }
 				return (
-					<div key={result.storedVector.sha} style={{ padding: "4px", paddingBottom: "8px", border: "light-grey", margin: "4px", borderStyle: "groove", borderRadius: "8px"}}>
+					<div key={result.storedVector.sha} className="search-result-container" >
 						<div>
-							<a style={{ padding: "8px" }} onClick={() => onClickNoteLink(result)}>
+							<a className="search-result-linktext" onClick={() => onClickNoteLink(result)}>
 								{'[[' + result.storedVector.linktext + ']]'}
 							</a>
-							<button style={{ cursor: 'pointer', width: '28px', height: '28px' }} onClick={() => copyToClipboard(result.storedVector.linktext)}><CopyIcon></CopyIcon></button>
+							<button className="search-result-copy-button" onClick={() => copyToClipboard(result.storedVector.linktext)}><CopyIcon></CopyIcon></button>
 						</div>
-						<p style={{ padding: "8px" }}>{result.content}</p>
+						<p className="search-result-content" >{result.content}</p>
 					</div>
 				)
 			})}
-			<div style={{ textAlign: "center" }}>
-				<button style={{ cursor: 'pointer' }} onClick={() => setResultShowNum(resultShowNum + 5)}>Show More</button>
+			<div className="search-results-show-more-container" >
+				<button className="search-results-show-more-button" onClick={() => setResultShowNum(resultShowNum + 5)}>Show More</button>
 			</div>
     </div>
   );

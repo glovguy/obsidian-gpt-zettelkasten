@@ -6,3 +6,42 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+.search-result-copy-button {
+  cursor: 'pointer';
+  width: '28px';
+  height: '28px';
+}
+
+.search-result-content {
+  padding: "8px";
+}
+
+.search-result-linktext {
+  padding: "8px";
+}
+
+.search-result-container {
+  padding: "4px";
+  padding-bottom: "8px";
+  border: "light-grey";
+  margin: "4px";
+  border-style: "groove";
+  border-radius: "8px";
+}
+
+.search-results-show-more-container {
+  text-align: "center";
+}
+
+.search-results-show-more-button {
+  cursor: 'pointer';
+}
+
+.search-results-search-count-subheader {
+  font-size: '12px';
+}
+
+.batch-embedding-matching-file-preview-container {
+  padding: "4px";
+  margin: "4px";
+}
