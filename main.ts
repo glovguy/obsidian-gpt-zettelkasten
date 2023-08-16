@@ -126,8 +126,6 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for Zettelkasten LLM Tools Plugin.'});
-
 		new Setting(containerEl)
 			.setName('OpenAI API Key')
 			.setDesc('Paste your OpenAI API key here.')
