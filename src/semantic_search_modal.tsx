@@ -105,7 +105,11 @@ const SearchResults = (
 							</a>
 							<button className="search-result-copy-button" onClick={() => copyToClipboard(result.storedVector.linktext)}><CopyIcon></CopyIcon></button>
 						</div>
+						<div style={{ marginLeft: '16px' }}>
+							Similarity: {result.similarity.toFixed(3)}
+						</div>
 						<p className="search-result-content" >{result.content}</p>
+						
 					</div>
 				)
 			})}
