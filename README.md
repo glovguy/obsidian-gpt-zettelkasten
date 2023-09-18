@@ -11,6 +11,16 @@ Zettelkasten note taking powered by Large Language Models.
   - Semantic Search for notes similar to current note
   - Batch generate embeddings and index notes based on a filename pattern
 
+## Installation through Community Plugins Registry
+
+- Navigate to Community Plugins tab in Obsidian
+- Click "Browse" \
+- Search for "Zettelkasten LLM Tools"
+- Select to install plugin
+- Navigate to Community Plugins tab in Obsidian
+- Select "Options" icon next to "Zettelkasten LLM Tools"
+- Fill in OpenAI API Key
+
 ## How to use
 
 First, add your OpenAI API Key in the settings page. After installing and activating the plugin, open the settings panel in Obsidian and click on `Zettelkasten LLM Tools` tab. [Request an API key from OpenAI](https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key) and paste it in the settings field.
