@@ -6,9 +6,10 @@ Zettelkasten note taking powered by Large Language Models.
 
 ## Features
 
-- Generate embeddings and index current note
-- Semantic Search for notes similar to current note
-- Batch generate embeddings and index notes based on a filename pattern
+- Semantic Search
+  - Generate embeddings and index current note
+  - Semantic Search for notes similar to current note
+  - Batch generate embeddings and index notes based on a filename pattern
 
 ## How to use
 
