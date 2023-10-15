@@ -6,30 +6,30 @@ import { generateAndStoreEmbeddings } from './semantic_search';
 
 
 export default class BatchVectorStorageModal extends Modal {
-	plugin: ZettelkastenLLMToolsPlugin;
+  plugin: ZettelkastenLLMToolsPlugin;
   allowPattern: string;
   disallowPattern: string;
 
-	constructor(app: App, plugin: ZettelkastenLLMToolsPlugin) {
-		super(app);
-		this.plugin = plugin;
-	}
+  constructor(app: App, plugin: ZettelkastenLLMToolsPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
 
-	async onOpen() {
-		const {contentEl} = this;
+  async onOpen() {
+    const {contentEl} = this;
     const root = createRoot(contentEl.appendChild(document.createElement('div')));
-		root.render(<BatchSetup plugin={this.plugin} modal={this} />);
-	}
+    root.render(<BatchSetup plugin={this.plugin} modal={this} />);
+  }
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
+  onClose() {
+    const {contentEl} = this;
+    contentEl.empty();
+  }
 }
 
 const bannedChars = [
-  '\\', '=', '`', '@', '"', "'", '{', '}', 
-  '+', '?', '!', '|', '$', '.', '!', 
+  '\\', '=', '`', '@', '"', "'", '{', '}',
+  '+', '?', '!', '|', '$', '.', '!',
   ':', '<', '>', '&', '%', '#'
 ];
 const BatchSetup = ({ plugin, modal }: { plugin: ZettelkastenLLMToolsPlugin, modal: BatchVectorStorageModal }) => {
@@ -88,8 +88,8 @@ const BatchSetup = ({ plugin, modal }: { plugin: ZettelkastenLLMToolsPlugin, mod
 
   return (
     <div>
-			<h1>Set up batch embedding</h1>
-			<span>Allow pattern: <input value={allowPattern} onChange={onAllowPatternChange}></input></span><p />
+      <h1>Set up batch embedding</h1>
+      <span>Allow pattern: <input value={allowPattern} onChange={onAllowPatternChange}></input></span><p />
       <span>Disallow pattern: <input value={disallowPattern} onChange={onDisallowPatternChange} ></input></span><p />
       <button onClick={enqueueEmbeddings}>Start batch embedding</button>
       <div>

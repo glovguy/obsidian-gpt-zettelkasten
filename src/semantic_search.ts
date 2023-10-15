@@ -48,7 +48,7 @@ export const generateAndStoreEmbeddings = async ({ files, app, vectorStore, file
       console.error("Vector already exists for [[" + linktext + "]]");
       return;
     }
-    
+
     const embedding = await generateOpenAiEmbeddings([filteredLines]);
     vectorStore.saveVector({ linktext, embedding, sha, path });
   }));

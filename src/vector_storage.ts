@@ -4,10 +4,10 @@ import { shaForString } from './utils';
 import { generateOpenAiEmbeddings } from './semantic_search';
 
 export interface StoredVector {
-	linktext: string;
+  linktext: string;
   path: string;
-	embedding: Array<number>;
-	sha: string;
+  embedding: Array<number>;
+  sha: string;
 }
 
 export interface VectorSearchResult {
@@ -65,7 +65,7 @@ export class VectorStore {
       results.push({ storedVector, similarity: cosineSim });
     });
 
-    return results.sort((a, b) => b.similarity - a.similarity); 
+    return results.sort((a, b) => b.similarity - a.similarity);
     // be sure to slice the results to the top n results
     // .slice(0, n);
   }
@@ -114,7 +114,7 @@ export class VectorStore {
   findVectorByFn(fn: (storedVector: StoredVector) => boolean): StoredVector | null {
     return this.plugin.settings.vectors.find(fn) || null;
   }
-  
+
   renameVector({ sha, newLinktext }: { sha: string, newLinktext: string }) {
     for (let i = 0; i < this.plugin.settings.vectors.length; i++) {
       if (this.plugin.settings.vectors[i].sha === sha) {
