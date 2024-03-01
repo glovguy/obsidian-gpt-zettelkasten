@@ -56,12 +56,14 @@ export class VectorStore {
     return dotProduct / (magnitudeA * magnitudeB);
   }
 
-  vectorSearch(queryEmbedding: StoredVector): VectorSearchResult[] {
+  vectorSearch(queryEmbedding: StoredVector | Array<number>): VectorSearchResult[] {
     const results: VectorSearchResult[] = [];
 
+    const searchEmbedding = (Array.isArray(queryEmbedding)) ? queryEmbedding : queryEmbedding.embedding;
+    const searchSha = (Array.isArray(queryEmbedding)) ? null : queryEmbedding.sha;
     this.vectors.forEach((storedVector) => {
-      if (queryEmbedding.sha === storedVector.sha) { return; }
-      const cosineSim = this.cosineSimilarity(queryEmbedding.embedding, storedVector.embedding);
+      if (searchSha === storedVector.sha) { return; }
+      const cosineSim = this.cosineSimilarity(searchEmbedding, storedVector.embedding);
       results.push({ storedVector, similarity: cosineSim });
     });
 

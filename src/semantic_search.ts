@@ -66,7 +66,7 @@ export class FileFilter {
   }
 
   filterOutMetaData(text: string) {
-    let currentDepth = 2;
+    let currentDepth = this.contentMarker ? this.contentMarker.split('#').length-1 : 0;
     let recording = true;
     const lines = text.split('\n');
     const filteredLines = lines.filter((line) => {

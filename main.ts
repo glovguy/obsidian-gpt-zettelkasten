@@ -4,13 +4,16 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  TFile
+  TFile,
+  WorkspaceLeaf,
 } from 'obsidian';
-import { initOpenAI, generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
+import { initOpenAI, generateAndStoreEmbeddings, FileFilter, generateVectorStoreClusters } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
 import SemanticSearchModal from './src/semantic_search_modal';
+import SemanticSearchTab from './src/semantic_search_tab';
+import type { VectorCluster } from './src/semantic_search'
 import BatchVectorStorageModal from './src/batch_vector_storage_modal';
-
+import { VIEW_TYPE_AI_SEARCH } from './src/constants';
 
 interface ZettelkastenLLMToolsPluginSettings {
   openaiAPIKey: string;
@@ -26,12 +29,14 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   allowPattern: '.*',
   disallowPattern: '',
   contentMarker: '',
+  topicClusters: [],
 }
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
   settings: ZettelkastenLLMToolsPluginSettings;
   vectorStore: VectorStore;
   fileFilter: FileFilter;
+  sideTab: SemanticSearchTab;
 
   async onload() {
     this.fileFilter = new FileFilter();
@@ -70,6 +75,11 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       }
     });
 
+    this.registerView(VIEW_TYPE_AI_SEARCH, (leaf: WorkspaceLeaf) => {
+      this.sideTab = new SemanticSearchTab(leaf, this);
+      return this.sideTab;
+    });
+
     // Populate vector store command
     this.addCommand({
       id: 'open-batch-generate-embeddings-modal',
@@ -79,16 +89,39 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       }
     });
 
+    // KMeans cluster command
+    this.addCommand({
+      id: 'create-kmeans-clusters',
+      name: 'Create KMeans clusters from embeddings',
+      callback: () => {
+        new ClusterCreateModal(this.app, this).open();
+        // generateVectorStoreClusters({ app: this.app, vectorStore: this.vectorStore, plugin: this })
+      }
+    });
+
     this.addSettingTab(new ZettelkastenLLMToolsPluginSettingTab(this.app, this));
+    
+    this.app.workspace.onLayoutReady(() => {
+      this.initLeaf();
+      this.sideTab.render();
+    });
   }
 
-  onunload() {
+  onunload(): void {
+    this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_SEARCH).forEach((leaf) => leaf.detach());
+  }
 
+  initLeaf(): void {
+    if (this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_SEARCH).length) {
+      return;
+    }
+    this.app.workspace.getRightLeaf(false).setViewState({
+      type: VIEW_TYPE_AI_SEARCH,
+    });
   }
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    // this.clearVectorSettings();
     initOpenAI(this.settings.openaiAPIKey);
     this.fileFilter.contentMarker = this.settings.contentMarker;
   }
