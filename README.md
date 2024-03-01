@@ -43,7 +43,15 @@ If a note in the batch has already been added to the index, and the exact conten
 
 ### Searching for notes similar to current note using semantic search
 
-To search for similar notes to the current open note using semantic search, open the [Obsidian command palette](https://help.obsidian.md/Plugins/Command+palette) and type "Semantic Search for notes similar to current note". If the current note doesn't yet have an embedding, one will be requested from OpenAI. Then, similar notes will be displayed in the modal in order of their similarity score (cosine similarity), along with their content text. (Note that this will only run a search over the notes that have been indexed locally with an embedding.) To copy the linktext of a note, click the icon next to its linktext to copy the linktext to the clipboard.
+To search for similar notes to the current open note using semantic search, you can do so either through  the [Obsidian command palette](https://help.obsidian.md/Plugins/Command+palette) or through the [right sidebar](https://help.obsidian.md/Getting+started/Use+the+mobile+app#Right+sidebar).
+
+To use command palette, open it and type "Semantic Search for notes similar to current note" and click enter to select the command. The results will be displayed in a modal. In order to run a new search, close the modal and run the command again.
+
+To use the right sidebar, open it and click the "star" icon to open the AI tab. Click the "Semantic Search" button to run a search. The results will be displayed in the right sidebar. To initiate a new search, navigate to another note and click the "Semantic Search" button again.
+
+Semantic search will look for notes similar to the one currently selected. The results are displayed in order of their similarity score (cosine similarity), along with their content text. (Note that this will only run a search over the notes that have been indexed locally with an embedding.)
+
+To copy the linktext of a note in the results list, click the icon next to its linktext to copy the linktext to the clipboard.
 
 ## Manually installing the plugin
 

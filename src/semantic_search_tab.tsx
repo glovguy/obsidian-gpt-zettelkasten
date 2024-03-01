@@ -25,7 +25,7 @@ export default class SemanticSearchTab extends ItemView {
   }
 
   getIcon(): string {
-    return 'star-list';
+    return 'star';
   }
 
   onClose(): Promise<void> {

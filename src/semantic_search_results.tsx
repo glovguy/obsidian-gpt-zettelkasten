@@ -28,7 +28,6 @@ const SemanticSearchResults = (
     navigator.clipboard.writeText(text)
     new Notice('Copied to clipboard');
   }
-  console.log("Gets to here")
 
   return (
     <div>
