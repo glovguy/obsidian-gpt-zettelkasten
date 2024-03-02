@@ -7,11 +7,11 @@ import {
   TFile,
   WorkspaceLeaf,
 } from 'obsidian';
-import { initOpenAI, generateAndStoreEmbeddings, FileFilter, generateVectorStoreClusters } from './src/semantic_search';
+import { initOpenAI } from './src/llm_client';
+import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
 import SemanticSearchModal from './src/semantic_search_modal';
 import SemanticSearchTab from './src/semantic_search_tab';
-import type { VectorCluster } from './src/semantic_search'
 import BatchVectorStorageModal from './src/batch_vector_storage_modal';
 import { VIEW_TYPE_AI_SEARCH } from './src/constants';
 
@@ -29,7 +29,6 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   allowPattern: '.*',
   disallowPattern: '',
   contentMarker: '',
-  topicClusters: [],
 }
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
@@ -89,16 +88,6 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       }
     });
 
-    // KMeans cluster command
-    this.addCommand({
-      id: 'create-kmeans-clusters',
-      name: 'Create KMeans clusters from embeddings',
-      callback: () => {
-        new ClusterCreateModal(this.app, this).open();
-        // generateVectorStoreClusters({ app: this.app, vectorStore: this.vectorStore, plugin: this })
-      }
-    });
-
     this.addSettingTab(new ZettelkastenLLMToolsPluginSettingTab(this.app, this));
     
     this.app.workspace.onLayoutReady(() => {
@@ -115,7 +104,11 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     if (this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_SEARCH).length) {
       return;
     }
-    this.app.workspace.getRightLeaf(false).setViewState({
+    const rightLeaf = this.app.workspace.getRightLeaf(false);
+    if (!rightLeaf) {
+      return;
+    }
+    rightLeaf.setViewState({
       type: VIEW_TYPE_AI_SEARCH,
     });
   }

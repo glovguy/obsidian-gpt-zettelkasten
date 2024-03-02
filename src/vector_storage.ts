@@ -1,7 +1,7 @@
 import { TFile } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from 'main';
 import { shaForString } from './utils';
-import { generateOpenAiEmbeddings } from './semantic_search';
+import { generateOpenAiEmbeddings } from './llm_client';
 
 export interface StoredVector {
   linktext: string;
