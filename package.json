@@ -20,9 +20,9 @@
 	"license": "MIT",
 	"devDependencies": {
 		"@types/crypto-js": "^4.1.1",
-		"@types/node": "^20.4.4",
-		"@types/react": "^18.2.15",
-		"@types/react-dom": "^18.2.7",
+		"@types/node": "^20.12.11",
+		"@types/react": "^18.3.2",
+		"@types/react-dom": "^18.3.0",
 		"@typescript-eslint/eslint-plugin": "5.29.0",
 		"@typescript-eslint/parser": "5.29.0",
 		"builtin-modules": "3.3.0",
