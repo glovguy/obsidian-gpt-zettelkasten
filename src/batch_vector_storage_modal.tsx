@@ -1,28 +1,36 @@
-import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Modal, App, Notice } from 'obsidian';
+import { Modal, App, Notice, TFile } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from '../main';
-import { generateAndStoreEmbeddings } from './semantic_search';
-
+import { useState } from 'react';
 
 export default class BatchVectorStorageModal extends Modal {
   plugin: ZettelkastenLLMToolsPlugin;
   allowPattern: string;
-  disallowPattern: string;
+  updateAllowPattern: (allowPattern: string) => void;
+  filesForIndex: (allowPattern: string) => TFile[];
 
-  constructor(app: App, plugin: ZettelkastenLLMToolsPlugin) {
+  constructor(
+    app: App, 
+    plugin: ZettelkastenLLMToolsPlugin, 
+    allowPattern: string,
+    filesForIndex: (allowPattern: string) => TFile[],
+    updateAllowPattern: (allowPattern: string) => void,
+  ) {
     super(app);
     this.plugin = plugin;
+    this.allowPattern = allowPattern;
+    this.filesForIndex = filesForIndex;
+    this.updateAllowPattern = updateAllowPattern;
   }
 
   async onOpen() {
     const {contentEl} = this;
     const root = createRoot(contentEl.appendChild(document.createElement('div')));
-    root.render(<BatchSetup plugin={this.plugin} modal={this} />);
+    root.render(<BatchSetup plugin={this.plugin} modal={this} filesForIndex={this.filesForIndex} allowPattern={this.allowPattern} updateAllowPattern={this.updateAllowPattern} />);
   }
 
   onClose() {
-    const {contentEl} = this;
+    const { contentEl } = this;
     contentEl.empty();
   }
 }
@@ -32,25 +40,21 @@ const bannedChars = [
   '+', '?', '!', '|', '$', '.', '!',
   ':', '<', '>', '&', '%', '#'
 ];
-const BatchSetup = ({ plugin, modal }: { plugin: ZettelkastenLLMToolsPlugin, modal: BatchVectorStorageModal }) => {
-  const [allowPattern, setAllowPattern] = useState(plugin.settings.allowPattern || '');
-  const [disallowPattern, setDisallowPattern] = useState(plugin.settings.disallowPattern || '');
-  const filterFiles = (allowPttrn: string, disallowPttrn: string) => {
-    const allowGroups = allowPttrn.toLowerCase().split(',').filter((s) => s.length > 0).map((s) => s.split('*').filter((s) => s.length > 0));
-    const disallowSubStrings = disallowPttrn.toLowerCase().split('*').filter((s) => s.length > 0);
-    return plugin.app.vault.getFiles().filter((file) => {
-      const path = file.path.toLowerCase();
-
-      return allowGroups.some((allowGroup) => {
-        return allowGroup.every((subString) => {
-          return path.includes(subString);
-        });
-      }) && !disallowSubStrings.some((subString) => {
-        return path.includes(subString);
-      });
-    });
-  };
-  const [filteredFiles, setFilteredFiles] = useState(() => filterFiles(allowPattern, disallowPattern));
+const BatchSetup = ({
+  plugin,
+  modal,
+  filesForIndex,
+  allowPattern: _allowPattern,
+  updateAllowPattern,
+}: {
+  plugin: ZettelkastenLLMToolsPlugin,
+  modal: BatchVectorStorageModal,
+  filesForIndex: (allowPattern: string) => TFile[],
+  allowPattern: string,
+  updateAllowPattern: (allowPattern: string) => void
+}) => {
+  const [allowPattern, setAllowPattern] = useState(_allowPattern);
+  const filteredFiles = filesForIndex(allowPattern);
 
   const stringCharacterFilter = (string: string) => {
     const json_string = JSON.stringify(string);
@@ -66,22 +70,12 @@ const BatchSetup = ({ plugin, modal }: { plugin: ZettelkastenLLMToolsPlugin, mod
 
   const onAllowPatternChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filteredValue = stringCharacterFilter(e.target.value);
-    setAllowPattern(stringCharacterFilter(filteredValue));
-    plugin.settings.allowPattern = filteredValue;
-    plugin.saveSettings();
-    setFilteredFiles(filterFiles(filteredValue, disallowPattern));
-  };
-
-  const onDisallowPatternChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const filteredValue = stringCharacterFilter(e.target.value);
-    setDisallowPattern(filteredValue);
-    plugin.settings.disallowPattern = filteredValue;
-    plugin.saveSettings();
-    setFilteredFiles(filterFiles(allowPattern, filteredValue));
+    setAllowPattern(filteredValue);
+    updateAllowPattern(filteredValue);
   };
 
   const enqueueEmbeddings = () => {
-    generateAndStoreEmbeddings({ files: filteredFiles, app: plugin.app, vectorStore: plugin.vectorStore, fileFilter: plugin.fileFilter });
+    plugin.reindex();
     new Notice(`Enqueued ${filteredFiles.length} files for embedding`);
     modal.close();
   };
@@ -90,7 +84,6 @@ const BatchSetup = ({ plugin, modal }: { plugin: ZettelkastenLLMToolsPlugin, mod
     <div>
       <h1>Set up batch embedding</h1>
       <span>Allow pattern: <input value={allowPattern} onChange={onAllowPatternChange}></input></span><p />
-      <span>Disallow pattern: <input value={disallowPattern} onChange={onDisallowPatternChange} ></input></span><p />
       <button onClick={enqueueEmbeddings}>Start batch embedding</button>
       <div>
         <h3>Preview</h3>

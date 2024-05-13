@@ -5,6 +5,7 @@ import { TFile, getIcon } from 'obsidian';
 import { Icon } from './icon';
 import ZettelkastenLLMToolsPlugin from '../main';
 import SemanticSearchResults from './semantic_search_results';
+import { allTags, filterMetaData } from './semantic_search';
 import { VIEW_TYPE_AI_SEARCH } from './constants';
 
 export default class SemanticSearchTab extends ItemView {
@@ -68,7 +69,9 @@ export default class SemanticSearchTab extends ItemView {
       if (!existingFile || !(existingFile instanceof TFile)) {
         return;
       }
-      match['content'] = this.plugin.fileFilter.filterOutMetaData(await this.app.vault.cachedRead(existingFile));
+      const fileText = await this.app.vault.cachedRead(existingFile);
+      match['content'] = filterMetaData(this.plugin.settings.contentMarker, fileText);
+      match['tags'] = allTags(fileText);
     }));
 
     this.root.render(

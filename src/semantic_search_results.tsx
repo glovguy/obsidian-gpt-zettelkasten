@@ -47,12 +47,12 @@ const SemanticSearchResults = (
             <div style={{ marginLeft: '16px' }}>
               Similarity: {result.similarity.toFixed(3)}
             </div>
-            <p className="search-result-content" >{result.content}</p>
-
+            <p className="search-result-content">{result.content}</p>
+            <p className="search-result-content">{result.tags?.join(' ')}</p>
           </div>
         )
       })}
-      <div className="search-results-show-more-container" >
+      <div className="search-results-show-more-container">
         <button className="search-results-show-more-button" onClick={() => setResultShowNum(resultShowNum + 5)}>Show More</button>
       </div>
     </div>

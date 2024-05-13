@@ -1,7 +1,7 @@
 import { TFile } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from 'main';
 import { shaForString } from './utils';
-import { generateOpenAiEmbeddings } from './llm_client';
+import { filterMetaData } from './semantic_search';
 
 export interface StoredVector {
   linktext: string;
@@ -22,12 +22,15 @@ export class VectorStore {
   plugin: ZettelkastenLLMToolsPlugin;
   vectors: LocalVectorDict;
   vectorShas: Set<string>;
+  embeddingsModelVersion: string;
 
   constructor(plugin: ZettelkastenLLMToolsPlugin) {
     this.plugin = plugin;
-    this.vectors = new Map(plugin.settings.vectors.map((vector: StoredVector) => [vector.linktext, vector]));
-    this.vectorShas = new Set(plugin.settings.vectors.map((vector: StoredVector) => vector.sha));
-    console.log("VectorStore inialized", this.vectors, this.vectorShas)
+    const { settings } = plugin;
+    this.vectors = new Map(settings.vectors.map((vector: StoredVector) => [vector.linktext, vector]));
+    this.vectorShas = new Set(settings.vectors.map((vector: StoredVector) => vector.sha));
+    settings.embeddingsModelVersion
+    console.info("VectorStore inialized", this.vectors, this.vectorShas)
   }
 
   numVectors(): number {
@@ -74,7 +77,8 @@ export class VectorStore {
 
   async upsertVector(file: TFile): Promise<StoredVector> {
     const { linktext } = this.plugin.linkTextForFile(file);
-    const filteredLines = this.plugin.fileFilter.filterOutMetaData(await this.plugin.app.vault.cachedRead(file));
+    const { llmClient } = this.plugin;
+    const filteredLines = filterMetaData(this.plugin.settings.contentMarker, await this.plugin.app.vault.cachedRead(file));
     if (filteredLines.length === 0) {
       throw new Error("Error extracting text for [[" + linktext + "]]");
     }
@@ -84,13 +88,13 @@ export class VectorStore {
       return storedVector;
     }
     if (storedVector && storedVector.sha !== sha) {
-      console.log(`Vector already exists for [[${linktext}]], but it was edited. Fixing...`);
+      console.info(`Vector already exists for [[${linktext}]], but it was edited. Fixing...`);
       this.deleteVectorBySha(storedVector.sha);
     } else if (this.vectorExists(sha)) {
-      console.log(`Vector already exists for [[${linktext}]], but was renamed. Fixing...`);
+      console.info(`Vector already exists for [[${linktext}]], but was renamed. Fixing...`);
       this.renameVector({ sha, newLinktext: linktext });
     }
-    const embedding = await generateOpenAiEmbeddings([filteredLines]);
+    const embedding = await llmClient.generateOpenAiEmbeddings([filteredLines]);
     const vector = { linktext, embedding, sha, path: file.path };
     this.saveVector(vector);
 

@@ -35,7 +35,7 @@ If the current note has already been added to the index, and the content text ha
 
 To index many notes at once, open the [Obsidian command palette](https://help.obsidian.md/Plugins/Command+palette) and type "Open batch generate embeddings modal". This will open the batch indexing modal.
 
-Create embedding vectors for only the notes you want by entering an "allow pattern" and/or a "disallow pattern". These patterns are not regex, but they do accept `*` as a wildcard. The "allow pattern" also admits multiple matching patterns, when separated by commas. In order to exclude a file that fits the "allow pattern", add a "disallow pattern" to remove it.
+Create embedding vectors for only the notes you want by entering an "allow pattern". These patterns are not regex, but they do accept `*` as a wildcard. The "allow pattern" also admits multiple matching patterns, when separated by commas. In order to exclude a file that fits the "allow pattern".
 
 The batch indexing modal will display a list of filepaths that match the patterns given. Once you've verified that this is the list you want to use, click to start the batch embedding, and the vector embeddings will be requested from OpenAI and stored to the local index.
 
