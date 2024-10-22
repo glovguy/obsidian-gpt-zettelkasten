@@ -1,4 +1,4 @@
-import { Configuration, OpenAIApi } from 'openai';
+import OpenAI from 'openai';
 
 let openai: any;
 
@@ -19,15 +19,14 @@ export const defaultEmbeddingModel = "v3_small"; // default for new vector store
 export const unlabelledEmbeddingModel = "v2"; // version used if vector store existed prior to label
 
 export class OpenAIClient {
-  openai: OpenAIApi;
+  openai: OpenAI;
   config: OpenAIClientConfig;
 
   constructor(apiKey: string, config?: OpenAIClientConfig) {
     this.config = config || { embeddings_model: defaultEmbeddingModel };
-    const configuration = new Configuration({
+    this.openai = new OpenAI({
       apiKey: apiKey,
     });
-    this.openai = new OpenAIApi(configuration);
   }
 
   async generateOpenAiEmbeddings(docs: Array<string>) {
@@ -36,11 +35,11 @@ export class OpenAIClient {
     if (model === availableEmbeddingsModels['v3_small']) {
       dimensions = 256;
     }
-    const embeddings = await this.openai.createEmbedding({
+    const embeddings = await this.openai.embeddings.create({
       model,
       input: docs,
       dimensions
     });
-    return embeddings.data.data.map((entry: any) => entry.embedding)[0];
+    return embeddings.data.map((entry: any) => entry.embedding)[0];
   };
 }

@@ -18,7 +18,7 @@ import type { EmbeddingModelNames } from './src/llm_client';
 import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
 import SemanticSearchModal from './src/semantic_search_modal';
-import SemanticSearchTab from './src/semantic_search_tab';
+import ZettelkastenAiTab from './src/semantic_search_tab';
 import BatchVectorStorageModal from './src/batch_vector_storage_modal';
 import { VIEW_TYPE_AI_SEARCH } from './src/constants';
 
@@ -42,7 +42,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   settings: ZettelkastenLLMToolsPluginSettings;
   vectorStore: VectorStore;
   fileFilter: FileFilter;
-  sideTab: SemanticSearchTab;
+  sideTab: ZettelkastenAiTab;
   llmClient: OpenAIClient;
 
   async onload() {
@@ -84,7 +84,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     });
 
     this.registerView(VIEW_TYPE_AI_SEARCH, (leaf: WorkspaceLeaf) => {
-      this.sideTab = new SemanticSearchTab(leaf, this);
+      this.sideTab = new ZettelkastenAiTab(leaf, this);
       return this.sideTab;
     });
 

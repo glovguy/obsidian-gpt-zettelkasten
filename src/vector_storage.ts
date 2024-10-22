@@ -14,6 +14,7 @@ export interface VectorSearchResult {
   storedVector: StoredVector;
   similarity: number;
   content?: string;
+  tags?: string[];
 };
 
 export type LocalVectorDict = Map<string, StoredVector>;
