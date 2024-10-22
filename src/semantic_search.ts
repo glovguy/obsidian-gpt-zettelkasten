@@ -18,13 +18,13 @@ export const generateAndStoreEmbeddings = async ({ files, app, vectorStore, cont
     }
     const sha = shaForString(filteredLines);
     if (vectorStore.vectorExists(sha) && !vectorStore.getVector(linktext)) {
-      console.error("Vector already exists for [[" + linktext + "]], but was renamed. Fixing...");
+      console.info("Vector already exists for [[" + linktext + "]], but was renamed. Fixing...");
       new Notice(`Vector already exists for [[${linktext}]], but was renamed. Fixing...`);
       vectorStore.renameVector({ sha, newLinktext: linktext });
       return;
     }
     if (vectorStore.vectorExists(sha) && vectorStore.getVector(linktext)) {
-      console.error("Vector already exists for [[" + linktext + "]]");
+      // Vector already exists
       return;
     }
     await concurrencyManager.add(async () => {
