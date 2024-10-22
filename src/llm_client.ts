@@ -4,6 +4,7 @@ let openai: any;
 
 interface OpenAIClientConfig {
   embeddings_model: EmbeddingModelNames;
+  quantization_decimals: number;
 }
 
 interface EmbeddingsModels {
@@ -17,13 +18,19 @@ export const availableEmbeddingsModels: EmbeddingsModels = {
 export type EmbeddingModelNames = keyof typeof availableEmbeddingsModels;
 export const defaultEmbeddingModel = "v3_small"; // default for new vector stores
 export const unlabelledEmbeddingModel = "v2"; // version used if vector store existed prior to label
+export const quantizationDecimals = 2;
+
+const defaultConfig = (): OpenAIClientConfig => ({
+  embeddings_model: defaultEmbeddingModel,
+  quantization_decimals: quantizationDecimals,
+});
 
 export class OpenAIClient {
   openai: OpenAI;
   config: OpenAIClientConfig;
 
   constructor(apiKey: string, config?: OpenAIClientConfig) {
-    this.config = config || { embeddings_model: defaultEmbeddingModel };
+    this.config = config || defaultConfig();
     this.openai = new OpenAI({
       apiKey: apiKey,
     });
@@ -40,6 +47,10 @@ export class OpenAIClient {
       input: docs,
       dimensions
     });
-    return embeddings.data.map((entry: any) => entry.embedding)[0];
+    return embeddings.data.map((entry: any) =>
+      entry.embedding.map((value: number) =>
+        Number(value.toFixed(this.config.quantization_decimals))
+      )
+    )[0];
   };
 }
