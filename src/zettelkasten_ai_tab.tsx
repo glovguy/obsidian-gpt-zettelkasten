@@ -1,3 +1,4 @@
+import React from 'react';
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { Root } from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
@@ -10,22 +11,21 @@ import { StoredVector, VectorSearchResult } from './vector_storage';
 import { VIEW_TYPE_AI_SEARCH } from './constants';
 import { App } from 'obsidian';
 import { useState } from 'react';
-import React from 'react';
+
 
 export default class ZettelkastenAiTab extends ItemView {
   plugin: ZettelkastenLLMToolsPlugin;
   root: Root;
-  SelectedView: (plugin: ZettelkastenLLMToolsPlugin, app: App) => JSX.Element;
+  selectedView: string;
   selectedViewLookup: { [key: string]: (plugin: ZettelkastenLLMToolsPlugin, app: App) => JSX.Element } = {
-    "semanticSearch": SemanticSearchTab,
-    "chatbot": () => <span>Chatbot</span>,
-    "summarize": () => <span>Summarize</span>,
+    "semanticSearch": SemanticSearchTabContent,
+    "chat": () => <span>Chat here</span>,
   };
 
   constructor(leaf: WorkspaceLeaf, plugin: ZettelkastenLLMToolsPlugin) {
     super(leaf);
     this.plugin = plugin;
-    this.SelectedView = this.selectedViewLookup["semanticSearch"];
+    this.selectedView = "semanticSearch";
   }
 
   getViewType(): string {
@@ -45,7 +45,13 @@ export default class ZettelkastenAiTab extends ItemView {
   }
 
   handleFunctionChange(value: string) {
-    this.SelectedView = this.selectedViewLookup[value];
+    this.selectedView = value;
+    this.render();
+  }
+
+  renderSelectedView(): JSX.Element {
+    const viewToRender = this.selectedViewLookup[this.selectedView];
+    return React.createElement(viewToRender, { plugin: this.plugin, app: this.app });
   }
 
   async render(): Promise<void> {
@@ -54,26 +60,22 @@ export default class ZettelkastenAiTab extends ItemView {
     this.root = createRoot(contentEl.appendChild(document.createElement('div')));
     this.root.render(
       <div>
-        <select onChange={(e) => this.handleFunctionChange(e.target.value)}>
+        <select value={this.selectedView} onChange={(e) => this.handleFunctionChange(e.target.value)}>
           <option value="semanticSearch">Semantic Search</option>
-          <option value="chatbot">Chatbot</option>
-          <option value="summarize">Summarize</option>
+          <option value="chat">Chat</option>
         </select>
         <hr />
-        {this.SelectedView(this.plugin, this.app)}
+        {this.renderSelectedView()}
       </div>
     );
   }
 }
 
-const SemanticSearchTab = function (plugin: ZettelkastenLLMToolsPlugin, app: App): JSX.Element {
-  return React.createElement(SemanticSearchTabContent, { plugin, app });
-};
 
 const SemanticSearchTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App }> = ({ plugin, app }) => {
   const [searching, setSearching] = useState<boolean>(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [activeFileVector, setActiveFileVector] = useState<any>(null);
+  const [searchResults, setSearchResults] = useState<VectorSearchResult[]>([]);
+  const [activeFileVector, setActiveFileVector] = useState<StoredVector | null>(null);
   const [errorGeneratingEmbedding, setErrorGeneratingEmbedding] = useState<boolean>(false);
 
   const awaitingEmbeddingPrompt = (BodyComponent: JSX.Element): JSX.Element => {
@@ -88,7 +90,6 @@ const SemanticSearchTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, a
   }
 
   const performSearch = async () => {
-    console.log("performSearch");
     setSearchResults([]);
     let activeFile = app.workspace.getActiveFile();
     if (!activeFile) {
