@@ -18,7 +18,7 @@ import type { EmbeddingModelNames } from './src/llm_client';
 import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
 import SemanticSearchModal from './src/semantic_search_modal';
-import ZettelkastenAiTab from './src/semantic_search_tab';
+import ZettelkastenAiTab from './src/zettelkasten_ai_tab';
 import BatchVectorStorageModal from './src/batch_vector_storage_modal';
 import { VIEW_TYPE_AI_SEARCH } from './src/constants';
 
@@ -65,7 +65,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
 
           generateAndStoreEmbeddings({
             vectorStore: this.vectorStore,
-            fileFilter: this.fileFilter,
+            contentMarker: this.settings.contentMarker,
             files: [activeFile],
             app: this.app,
             llmClient: this.llmClient,
