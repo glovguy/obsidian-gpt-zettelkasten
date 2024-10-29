@@ -13,6 +13,7 @@ import {
   defaultEmbeddingModel,
   unlabelledEmbeddingModel,
   availableEmbeddingsModels,
+  AnthropicClient,
 } from './src/llm_client';
 import type { EmbeddingModelNames } from './src/llm_client';
 import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
@@ -24,6 +25,7 @@ import { VIEW_TYPE_AI_SEARCH } from './src/constants';
 
 interface ZettelkastenLLMToolsPluginSettings {
   openaiAPIKey: string;
+  anthropicAPIKey: string;
   vectors: Array<StoredVector>;
   allowPattern: string;
   contentMarker: string;
@@ -32,6 +34,7 @@ interface ZettelkastenLLMToolsPluginSettings {
 
 const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   openaiAPIKey: '',
+  anthropicAPIKey: '',
   vectors: [],
   allowPattern: '.*',
   contentMarker: '',
@@ -44,6 +47,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   fileFilter: FileFilter;
   sideTab: ZettelkastenAiTab;
   llmClient: OpenAIClient;
+  anthropicClient: AnthropicClient;
 
   async onload() {
     this.fileFilter = new FileFilter();
@@ -138,6 +142,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       this.settings.embeddingsModelVersion = unlabelledEmbeddingModel;
     }
     this.llmClient = new OpenAIClient(this.settings.openaiAPIKey);
+    this.anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
   }
 
   clearVectorArray() {
@@ -149,6 +154,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     console.log('saving...');
     await this.saveData(this.settings);
     this.llmClient = new OpenAIClient(this.settings.openaiAPIKey);
+    this.anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
     console.log('done');
   }
 
@@ -213,6 +219,17 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.openaiAPIKey)
         .onChange(async (value) => {
           this.plugin.settings.openaiAPIKey = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Anthropic API Key')
+      .setDesc('Paste your Anthropic API key here.')
+      .addText(text => text
+        .setPlaceholder('Enter your API key')
+        .setValue(this.plugin.settings.anthropicAPIKey)
+        .onChange(async (value) => {
+          this.plugin.settings.anthropicAPIKey = value;
           await this.plugin.saveSettings();
         }));
 
