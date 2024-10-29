@@ -25,11 +25,21 @@ Zettelkasten note taking powered by Large Language Models.
 
 First, add your OpenAI API Key in the settings page. After installing and activating the plugin, open the settings panel in Obsidian and click on `Zettelkasten LLM Tools` tab. [Request an API key from OpenAI](https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key) and paste it in the settings field.
 
-### Generating index for current note
+### Rewriting notes with copilot
 
-In order to index only one note, open the [Obsidian command palette](https://help.obsidian.md/Plugins/Command+palette), type "Generate embeddings for current note", and hit enter. The note will have a vector embedding created via OpenAI API, and that will be added to the local index.
+The copilot feature helps you improve your notes by suggesting revisions. To use it:
 
-If the current note has already been added to the index, and the content text has not changed since the last embedding was created, it will not request a new embedding vector. If the content text has changed at all, a new embedding vector will be requested.
+1. Open the right sidebar and click the "star" icon to open the AI tab
+2. Select "Copilot" from the dropdown menu, if it is not already selected
+3. Click "Refresh" to get suggestions for the currently open note
+
+The copilot will analyze your note and suggest improvements focused on:
+- Clear titles
+- Single, focused ideas
+- Relevant links and connections
+- Appropriate tags
+
+If the note would be better split into multiple notes, the copilot will suggest how to break it up.
 
 ### Batch generating indices for notes
 
@@ -41,15 +51,26 @@ The batch indexing modal will display a list of filepaths that match the pattern
 
 If a note in the batch has already been added to the index, and the exact content text has not changed since the last embedding was created, it will not request a new embedding vector. If the content text has changed at all, a new embedding vector will be requested.
 
+### Generating index for only current note
+
+In order to index only one note, open the [Obsidian command palette](https://help.obsidian.md/Plugins/Command+palette), type "Generate embeddings for current note", and hit enter. The note will have a vector embedding created via OpenAI API, and that will be added to the local index.
+
+If the current note has already been added to the index, and the content text has not changed since the last embedding was created, it will not request a new embedding vector. If the content text has changed at all, a new embedding vector will be requested.
+
 ### Searching for notes similar to current note using semantic search
 
 To search for similar notes to the current open note using semantic search, you can do so either through  the [Obsidian command palette](https://help.obsidian.md/Plugins/Command+palette) or through the [right sidebar](https://help.obsidian.md/Getting+started/Use+the+mobile+app#Right+sidebar).
 
 To use command palette, open it and type "Semantic Search for notes similar to current note" and click enter to select the command. The results will be displayed in a modal. In order to run a new search, close the modal and run the command again.
 
-To use the right sidebar, open it and click the "star" icon to open the AI tab. Click the "Semantic Search" button to run a search. The results will be displayed in the right sidebar. To initiate a new search, navigate to another note and click the "Semantic Search" button again.
+To use it through the right sidebar:
+1. Open the sidebar and click the "star" icon to open the AI tab.
+2. Select "Semantic Search" from the dropdown menu if it's not already selected.
+3. Click the "Semantic Search for active file" button to run a search.
 
-Semantic search will look for notes similar to the one currently selected. The results are displayed in order of their similarity score (cosine similarity), along with their content text. (Note that this will only run a search over the notes that have been indexed locally with an embedding.)
+The results will be displayed in the right sidebar. To initiate a new search, navigate to another note and click the search button again.
+
+Semantic search will look for notes similar to the one currently selected. The results are displayed in order of their similarity score (cosine similarity), along with their content text. (Note that this will only run a search over the notes that have been indexed locally with an embedding. If notes are missing here, run the batch create embeddings command above.)
 
 To copy the linktext of a note in the results list, click the icon next to its linktext to copy the linktext to the clipboard.
 
