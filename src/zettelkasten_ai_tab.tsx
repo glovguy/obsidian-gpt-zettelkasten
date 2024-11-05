@@ -3,25 +3,16 @@ import ReactMarkdown from 'react-markdown';
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { Root } from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
-import { TFile, getIcon } from 'obsidian';
-import { Icon } from './icon';
 import ZettelkastenLLMToolsPlugin from '../main';
-import SemanticSearchResults from './semantic_search_results';
-import { allTags, filterMetaData } from './semantic_search';
-import { StoredVector, VectorSearchResult } from './vector_storage';
-import { VIEW_TYPE_AI_SEARCH } from './constants';
+import { VIEW_TYPE_AI_COPILOT } from './constants';
 import { App } from 'obsidian';
 import { useState } from 'react';
 
 
-export default class ZettelkastenAiTab extends ItemView {
+export default class CopilotTab extends ItemView {
   plugin: ZettelkastenLLMToolsPlugin;
   root: Root;
   selectedView: string;
-  selectedViewLookup: { [key: string]: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App }> } = {
-    "semanticSearch": SemanticSearchTabContent,
-    "copilot": CopilotTabContent,
-  };
 
   constructor(leaf: WorkspaceLeaf, plugin: ZettelkastenLLMToolsPlugin) {
     super(leaf);
@@ -30,7 +21,7 @@ export default class ZettelkastenAiTab extends ItemView {
   }
 
   getViewType(): string {
-    return VIEW_TYPE_AI_SEARCH;
+    return VIEW_TYPE_AI_COPILOT;
   }
 
   getDisplayText(): string {
@@ -51,7 +42,7 @@ export default class ZettelkastenAiTab extends ItemView {
   }
 
   renderSelectedView(): JSX.Element {
-    const viewToRender = this.selectedViewLookup[this.selectedView];
+    const viewToRender = CopilotTabContent;
     return React.createElement(viewToRender, { plugin: this.plugin, app: this.app });
   }
 
@@ -61,11 +52,6 @@ export default class ZettelkastenAiTab extends ItemView {
     this.root = createRoot(contentEl.appendChild(document.createElement('div')));
     this.root.render(
       <div>
-        <select value={this.selectedView} onChange={(e) => this.handleFunctionChange(e.target.value)}>
-          <option value="semanticSearch">Semantic Search</option>
-          <option value="copilot">Copilot</option>
-        </select>
-        <hr />
         {this.renderSelectedView()}
       </div>
     );
@@ -109,7 +95,9 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
 
   return (
     <div>
-      <button onClick={() => populateCopilotSuggest()}>Refresh</button><p></p>
+      <h1>Copilot Note Suggestions</h1>
+      <button onClick={() => populateCopilotSuggest()}>Suggest Revisions</button><br />
+      <hr></hr>
       {isLoadingResponse && <span>Loading...</span>}<p></p>
       {response.includes('<note>') ? (
         <ReactMarkdown>{response.match(/<note>([\s\S]*?)<\/note>/)?.[1] || ''}</ReactMarkdown>
@@ -119,78 +107,3 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
     </div>
   );
 }
-
-const SemanticSearchTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App }> = ({ plugin, app }) => {
-  const [searching, setSearching] = useState<boolean>(false);
-  const [searchResults, setSearchResults] = useState<VectorSearchResult[]>([]);
-  const [activeFileVector, setActiveFileVector] = useState<StoredVector | null>(null);
-  const [errorGeneratingEmbedding, setErrorGeneratingEmbedding] = useState<boolean>(false);
-
-  const awaitingEmbeddingPrompt = (BodyComponent: JSX.Element): JSX.Element => {
-    return (
-      <div>
-        <button onClick={performSearch}>
-          <Icon svg={getIcon('search')!} /> Semantic Search for active file
-        </button><br />
-        {BodyComponent}
-      </div>
-    );
-  }
-
-  const performSearch = async () => {
-    setSearchResults([]);
-    let activeFile = app.workspace.getActiveFile();
-    if (!activeFile) {
-      setSearching(false);
-      return;
-    }
-
-    setSearching(true);
-    let fileVectorResult: StoredVector;
-    try {
-      fileVectorResult = await plugin.vectorStore.upsertVector(activeFile);
-      setActiveFileVector(fileVectorResult);
-    } catch (e) {
-      console.error("Error getting embedding: ", e)
-      setSearching(false);
-      setErrorGeneratingEmbedding(true);
-      return;
-    }
-
-    const topMatches = plugin.vectorStore.vectorSearch(fileVectorResult);
-
-    await Promise.all(topMatches.map(async (match: VectorSearchResult) => {
-      let existingFile = app.vault.getAbstractFileByPath(match.storedVector.path);
-      if (!existingFile || !(existingFile instanceof TFile)) {
-        return;
-      }
-      const fileText = await app.vault.cachedRead(existingFile);
-      match['content'] = filterMetaData(plugin.settings.contentMarker, fileText);
-      match['tags'] = allTags(fileText);
-    }));
-
-    setSearching(false);
-    setSearchResults(topMatches);
-  }
-
-  if (searching && !activeFileVector) {
-    return (<span>Getting embedding...</span>);
-  }
-  if (searching && activeFileVector) {
-    return (<span>Searching... {plugin.vectorStore.numVectors()} entries</span>);
-  }
-  if (errorGeneratingEmbedding) {
-    return (<span>There was an issue generating the vector for the active document</span>);
-  }
-  if (activeFileVector && searchResults.length > 0) {
-    return (awaitingEmbeddingPrompt(
-        <SemanticSearchResults results={searchResults}
-          activeFileLinktext={activeFileVector.linktext}
-          plugin={plugin}
-          noteLinkClickedCallback={undefined} />
-      )
-    );
-  }
-
-  return awaitingEmbeddingPrompt(<span>Search for docs similar to active window</span>);
-};

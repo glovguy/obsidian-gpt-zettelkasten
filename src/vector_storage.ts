@@ -30,8 +30,7 @@ export class VectorStore {
     const { settings } = plugin;
     this.vectors = new Map(settings.vectors.map((vector: StoredVector) => [vector.linktext, vector]));
     this.vectorShas = new Set(settings.vectors.map((vector: StoredVector) => vector.sha));
-    settings.embeddingsModelVersion
-    console.info("VectorStore inialized", this.vectors, this.vectorShas)
+    console.info(`VectorStore inialized with ${Object.keys(this.vectors).length} entries`);
   }
 
   numVectors(): number {

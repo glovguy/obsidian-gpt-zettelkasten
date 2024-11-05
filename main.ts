@@ -19,9 +19,10 @@ import type { EmbeddingModelNames } from './src/llm_client';
 import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
 import SemanticSearchModal from './src/semantic_search_modal';
-import ZettelkastenAiTab from './src/zettelkasten_ai_tab';
+import CopilotTab from './src/zettelkasten_ai_tab';
 import BatchVectorStorageModal from './src/batch_vector_storage_modal';
-import { VIEW_TYPE_AI_SEARCH } from './src/constants';
+import { VIEW_TYPE_AI_COPILOT, VIEW_TYPE_AI_SEARCH } from './src/constants';
+import SemanticSearchTab from 'src/semantic_search_tab';
 
 interface ZettelkastenLLMToolsPluginSettings {
   openaiAPIKey: string;
@@ -45,7 +46,8 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   settings: ZettelkastenLLMToolsPluginSettings;
   vectorStore: VectorStore;
   fileFilter: FileFilter;
-  sideTab: ZettelkastenAiTab;
+  copilotTab: CopilotTab;
+  semanticSearchTab: SemanticSearchTab;
   llmClient: OpenAIClient;
   anthropicClient: AnthropicClient;
 
@@ -87,9 +89,14 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       }
     });
 
+    this.registerView(VIEW_TYPE_AI_COPILOT, (leaf: WorkspaceLeaf) => {
+      this.copilotTab = new CopilotTab(leaf, this);
+      return this.copilotTab;
+    });
+
     this.registerView(VIEW_TYPE_AI_SEARCH, (leaf: WorkspaceLeaf) => {
-      this.sideTab = new ZettelkastenAiTab(leaf, this);
-      return this.sideTab;
+      this.semanticSearchTab = new SemanticSearchTab(leaf, this);
+      return this.semanticSearchTab;
     });
 
     // Populate vector store command
@@ -113,25 +120,48 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     
     this.app.workspace.onLayoutReady(() => {
       this.initLeaf();
-      this.sideTab.render();
+      if (this.copilotTab) {
+        this.copilotTab.render();
+      }
+      if (this.semanticSearchTab) {
+        this.semanticSearchTab.render();
+      }
     });
   }
 
   onunload(): void {
     this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_SEARCH).forEach((leaf) => leaf.detach());
+    this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_COPILOT).forEach((leaf) => leaf.detach());
   }
 
   initLeaf(): void {
-    if (this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_SEARCH).length) {
+    // Check if both leaves already exist
+    const hasSearchLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_SEARCH).length > 0;
+    const hasCopilotLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_AI_COPILOT).length > 0;
+
+    if (hasSearchLeaf && hasCopilotLeaf) {
       return;
     }
-    const rightLeaf = this.app.workspace.getRightLeaf(false);
-    if (!rightLeaf) {
-      return;
+
+    // Create search leaf if missing
+    if (!hasSearchLeaf) {
+      const rightLeaf = this.app.workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        rightLeaf.setViewState({
+          type: VIEW_TYPE_AI_SEARCH,
+        });
+      }
     }
-    rightLeaf.setViewState({
-      type: VIEW_TYPE_AI_SEARCH,
-    });
+
+    // Create copilot leaf if missing
+    if (!hasCopilotLeaf) {
+      const rightLeaf = this.app.workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        rightLeaf.setViewState({
+          type: VIEW_TYPE_AI_COPILOT,
+        });
+      }
+    }
   }
 
   async loadSettings() {

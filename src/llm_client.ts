@@ -78,13 +78,13 @@ export class OpenAIClient {
       input: docs,
       dimensions
     });
-    console.log("embeddings, two ways: ");
-    console.log(embeddings.data.map((entry: any) => entry.embedding)[0]);
-    console.log(embeddings.data.map((entry: any) =>
-      entry.embedding.map((value: number) =>
-        Number(value.toFixed(this.config.quantization_decimals))
-      )
-    )[0]);
+    // console.log("embeddings, two ways: ");
+    // console.log(embeddings.data.map((entry: any) => entry.embedding)[0]);
+    // console.log(embeddings.data.map((entry: any) =>
+    //   entry.embedding.map((value: number) =>
+    //     Number(value.toFixed(this.config.quantization_decimals))
+    //   )
+    // )[0]);
     return embeddings.data.map((entry: any) => entry.embedding)[0];
   };
 }
