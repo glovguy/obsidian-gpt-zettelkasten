@@ -6,6 +6,7 @@ import {
   PluginSettingTab,
   Setting,
   TFile,
+  TFolder,
   WorkspaceLeaf,
 } from 'obsidian';
 import {
@@ -29,6 +30,7 @@ interface ZettelkastenLLMToolsPluginSettings {
   anthropicAPIKey: string;
   vectors: Array<StoredVector>;
   allowPattern: string;
+  permNotesFolder: string;
   contentMarker: string;
   embeddingsModelVersion?: string;
 }
@@ -38,6 +40,7 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   anthropicAPIKey: '',
   vectors: [],
   allowPattern: '.*',
+  permNotesFolder: '',
   contentMarker: '',
   embeddingsModelVersion: defaultEmbeddingModel,
 }
@@ -312,6 +315,30 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
           this.plugin.settings.allowPattern = value;
           await this.plugin.saveSettings();
         }));
+
+    new Setting(containerEl)
+      .setName('Permanent Notes folder')
+      .setDesc('Select folder containing notes to index')
+      .addDropdown(dropdown => {
+        // Get all folders in vault
+        const folders = this.app.vault.getAllLoadedFiles()
+          .filter((f): f is TFolder => f instanceof TFolder)
+          .map(f => f.path);
+
+        // Add root folder option
+        folders.unshift('/');
+
+        // Populate dropdown with folder paths
+        folders.forEach(folder => {
+          dropdown.addOption(folder, folder);
+        });
+
+        dropdown.setValue(this.plugin.settings.permNotesFolder || '/')
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.permNotesFolder = value;
+          await this.plugin.saveSettings();
+        });
+      });
   }
 }
 
