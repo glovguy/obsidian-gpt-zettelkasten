@@ -25,25 +25,38 @@ import BatchVectorStorageModal from './src/batch_vector_storage_modal';
 import { VIEW_TYPE_AI_COPILOT, VIEW_TYPE_AI_SEARCH } from './src/constants';
 import SemanticSearchTab from 'src/semantic_search_tab';
 
+
+interface noteGroupSettings {
+  name: string;
+  notesFolder: string | null;
+  copilotPrompt: string;
+};
+
 interface ZettelkastenLLMToolsPluginSettings {
   openaiAPIKey: string;
   anthropicAPIKey: string;
   vectors: Array<StoredVector>;
   allowPattern: string;
-  permNotesFolder: string;
+  noteGroups: Array<noteGroupSettings>;
   contentMarker: string;
   embeddingsModelVersion?: string;
-}
+};
+
+const DEFAULT_NOTE_GROUPS: Array<noteGroupSettings> = [{
+  name: "Permanent Notes",
+  notesFolder: null,
+  copilotPrompt: 'The following is a Zettelkasten note written by the user. The note should have 1. a clear title, 2. a single, clear thought stated briefly, 3. links to relevant ideas.\nSuggest revisions for this note. Be very brief and concise. Imitate their writing style. If you show an example of the suggested edits, wrap them in a <note></note> tag. If you want to suggest splitting into multiple notes, use more than one <note></note> tag.',
+}];
 
 const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   openaiAPIKey: '',
   anthropicAPIKey: '',
   vectors: [],
   allowPattern: '.*',
-  permNotesFolder: '',
+  noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
   contentMarker: '',
   embeddingsModelVersion: defaultEmbeddingModel,
-}
+};
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
   settings: ZettelkastenLLMToolsPluginSettings;
@@ -316,29 +329,79 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    new Setting(containerEl)
-      .setName('Permanent Notes folder')
-      .setDesc('Select folder containing notes to index')
-      .addDropdown(dropdown => {
-        // Get all folders in vault
-        const folders = this.app.vault.getAllLoadedFiles()
-          .filter((f): f is TFolder => f instanceof TFolder)
-          .map(f => f.path);
+    this.plugin.settings.noteGroups.forEach((noteGroup, i) => {
+      // Create container div for this note group
+      const groupContainer = containerEl.createDiv('note-group-container');
+      groupContainer.style.border = '1px solid var(--background-modifier-border)';
+      groupContainer.style.padding = '10px';
+      groupContainer.style.marginBottom = '20px';
+      groupContainer.style.borderRadius = '5px';
 
-        // Add root folder option
-        folders.unshift('/');
+      // Add heading for group number
+      const groupHeading = groupContainer.createEl('h3');
+      groupHeading.setText(`Note Group ${i + 1}`);
+      groupHeading.style.marginTop = '0';
+      groupHeading.style.marginBottom = '10px';
 
-        // Populate dropdown with folder paths
-        folders.forEach(folder => {
-          dropdown.addOption(folder, folder);
+      // group name
+      new Setting(groupContainer)
+        .setName('Group Name')
+        .setDesc('Name of the group of notes')
+        .addText(text => text
+          .setPlaceholder('Permanent Notes')
+          .setValue(noteGroup.name)
+          .onChange(async (value) => {
+            this.plugin.settings.noteGroups[i].name = value;
+            await this.plugin.saveSettings();
+          }));
+
+      // select folder
+      new Setting(groupContainer)
+        .setName('Permanent Notes folder')
+        .setDesc('Select folder containing notes to index')
+        .addDropdown(dropdown => {
+          const NO_FOLDER_SELECTED = '(none selected)';
+          
+          // Get all folders in vault
+          const folders = this.app.vault.getAllLoadedFiles()
+            .filter((f): f is TFolder => f instanceof TFolder)
+            .map(f => f.path);
+          // TODO: add filter for existing groups to ensure they aren't shown here
+  
+          // Add root folder option and "none selected"
+          // folders.unshift('/');
+          folders.unshift(NO_FOLDER_SELECTED);
+          folders.sort();
+  
+          // Populate dropdown with folder paths
+          folders.forEach(folder => {
+            dropdown.addOption(folder, folder);
+          });
+  
+          dropdown.setValue(noteGroup.notesFolder ?? NO_FOLDER_SELECTED);
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.noteGroups[i].notesFolder = value === NO_FOLDER_SELECTED ? null : value;
+            await this.plugin.saveSettings();
+          });
         });
 
-        dropdown.setValue(this.plugin.settings.permNotesFolder || '/')
-        dropdown.onChange(async (value) => {
-          this.plugin.settings.permNotesFolder = value;
-          await this.plugin.saveSettings();
+      // prompt write
+      new Setting(groupContainer)
+        .setName('Copilot Prompt')
+        .setDesc('System prompt used by this note group')
+        .addTextArea(text => {
+          text.inputEl.style.width = '100%';
+          text.inputEl.style.height = '150px';
+          return text
+            .setPlaceholder('')
+            .setValue(noteGroup.copilotPrompt)
+            .onChange(async (value) => {
+              this.plugin.settings.noteGroups[i].copilotPrompt = value;
+              await this.plugin.saveSettings();
+            });
         });
-      });
+    })
+
   }
 }
 

@@ -9,6 +9,8 @@ import { App } from 'obsidian';
 import { useState } from 'react';
 
 
+const DEFAULT_SYSTEM_PROMPT = 'The following is a Zettelkasten note written by the user. The note should have 1. a clear title, 2. a single, clear thought stated briefly, 3. links to relevant ideas.\nSuggest revisions for this note. Be very brief and concise. Imitate their writing style. If you show an example of the suggested edits, wrap them in a <note></note> tag. If you want to suggest splitting into multiple notes, use more than one <note></note> tag.';
+
 export default class CopilotTab extends ItemView {
   plugin: ZettelkastenLLMToolsPlugin;
   root: Root;
@@ -68,6 +70,12 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
       setResponse('Error loading current file...');
       return;
     }
+
+    // Find which note group this file belongs to
+    const matchingNoteGroup = plugin.settings.noteGroups.find(group => {
+      if (!group.notesFolder || !activeFile) return false;
+      return activeFile.path.startsWith(group.notesFolder);
+    });
     setIsLoadingResponse(true);
     const activeFileText = await plugin.app.vault.cachedRead(activeFile);
     const activeFileTitle = activeFile.basename;
@@ -76,9 +84,10 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
       const tagCounts = (app.metadataCache as any).getTags(); // getTags works but is not documented
       const tags = tagCounts ? Object.keys(tagCounts) : null;
       const tagsMessage = tags ? `\ntags used in vault: ${tags.join(" ")}` : "";
+      const system_prompt = matchingNoteGroup?.copilotPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
       const msg = await plugin.anthropicClient.createMessage(
-        'The following is a Zettelkasten note written by the user. The note should have 1. a clear title, 2. a single, clear thought stated briefly, 3. links to relevant ideas.\nSuggest revisions for this note. Be very brief and concise. Imitate their writing style. If you show an example of the suggested edits, wrap them in a <note></note> tag. If you want to suggest splitting into multiple notes, use more than one <note></note> tag.',
+        system_prompt,
         [
           { role: 'user', content: `<note>\n# ${activeFileTitle}\n${activeFileText}</note>${tagsMessage}` }
         ],
