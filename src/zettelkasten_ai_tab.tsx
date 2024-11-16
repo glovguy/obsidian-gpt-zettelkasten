@@ -4,9 +4,10 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { Root } from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
 import ZettelkastenLLMToolsPlugin from '../main';
+import { NoteGroup } from './note_group';
 import { VIEW_TYPE_AI_COPILOT } from './constants';
 import { App } from 'obsidian';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 
 const DEFAULT_SYSTEM_PROMPT = 'The following is a Zettelkasten note written by the user. The note should have 1. a clear title, 2. a single, clear thought stated briefly, 3. links to relevant ideas.\nSuggest revisions for this note. Be very brief and concise. Imitate their writing style. If you show an example of the suggested edits, wrap them in a <note></note> tag. If you want to suggest splitting into multiple notes, use more than one <note></note> tag.';
@@ -63,19 +64,39 @@ export default class CopilotTab extends ItemView {
 const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App }> = ({ plugin, app }) => {
   const [response, setResponse] = useState('Click refresh to show suggestion');
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
+  const [activeFile, setActiveFile] = useState(app.workspace.getActiveFile());
+  const [matchingNoteGroup, setMatchingNoteGroup] = useState<NoteGroup | undefined>(plugin.settings.noteGroups.find(group => {
+    const initialActiveFile = app.workspace.getActiveFile();
+    if (!group.notesFolder || !initialActiveFile) { return false; }
+    return initialActiveFile.path.startsWith(group.notesFolder);
+  }));
+
+  useEffect(() => {
+    const onFileChange = () => {
+      const newActiveFile = app.workspace.getActiveFile();
+      if (newActiveFile !== activeFile) {
+        setActiveFile(newActiveFile);
+        const newMatchingNoteGroup = plugin.settings.noteGroups.find(group => {
+          if (!group.notesFolder || !newActiveFile) { return false; }
+          return newActiveFile.path.startsWith(group.notesFolder);
+        });
+        setMatchingNoteGroup(newMatchingNoteGroup);
+      }
+    };
+
+    app.workspace.on('active-leaf-change', onFileChange);
+
+    return () => {
+      app.workspace.off('active-leaf-change', onFileChange);
+    };
+  }, [activeFile, app.workspace]);
 
   const populateCopilotSuggest = async () => {
-    let activeFile = app.workspace.getActiveFile();
     if (!activeFile) {
       setResponse('Error loading current file...');
       return;
     }
 
-    // Find which note group this file belongs to
-    const matchingNoteGroup = plugin.settings.noteGroups.find(group => {
-      if (!group.notesFolder || !activeFile) return false;
-      return activeFile.path.startsWith(group.notesFolder);
-    });
     setIsLoadingResponse(true);
     const activeFileText = await plugin.app.vault.cachedRead(activeFile);
     const activeFileTitle = activeFile.basename;
@@ -105,8 +126,9 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
   return (
     <div>
       <h1>Copilot Note Suggestions</h1>
+      {(matchingNoteGroup !== undefined) ? (<p>In group <i>{matchingNoteGroup.name}</i></p>) : (<p>(Not part of any note group.)</p>)}<br />
       <button onClick={() => populateCopilotSuggest()}>Suggest Revisions</button><br />
-      <hr></hr>
+      <hr />
       {isLoadingResponse && <span>Loading...</span>}<p></p>
       {response.includes('<note>') ? (
         <ReactMarkdown>{response.match(/<note>([\s\S]*?)<\/note>/)?.[1] || ''}</ReactMarkdown>

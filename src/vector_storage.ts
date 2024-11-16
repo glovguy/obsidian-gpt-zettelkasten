@@ -30,7 +30,7 @@ export class VectorStore {
     const { settings } = plugin;
     this.vectors = new Map(settings.vectors.map((vector: StoredVector) => [vector.linktext, vector]));
     this.vectorShas = new Set(settings.vectors.map((vector: StoredVector) => vector.sha));
-    console.info(`VectorStore inialized with ${Object.keys(this.vectors).length} entries`);
+    console.info(`VectorStore initialized with ${this.vectors.size} entries`);
   }
 
   numVectors(): number {
@@ -130,5 +130,16 @@ export class VectorStore {
       }
     }
     throw new Error("Vector not found");
+  }
+
+  async hasFileBeenIndexed(file: TFile): Promise<boolean> {
+    const filteredLines = filterMetaData(this.plugin.settings.contentMarker, await this.plugin.app.vault.cachedRead(file));
+    if (filteredLines.length === 0) {
+      return false;
+    }
+    const sha = shaForString(filteredLines);
+    const { linktext } = this.plugin.linkTextForFile(file);
+    const vectorForFile = this.vectors.get(linktext);
+    return (vectorForFile !== undefined) && vectorForFile.sha === sha;
   }
 }

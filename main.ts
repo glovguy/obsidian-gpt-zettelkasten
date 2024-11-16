@@ -24,35 +24,22 @@ import CopilotTab from './src/zettelkasten_ai_tab';
 import BatchVectorStorageModal from './src/batch_vector_storage_modal';
 import { VIEW_TYPE_AI_COPILOT, VIEW_TYPE_AI_SEARCH } from './src/constants';
 import SemanticSearchTab from 'src/semantic_search_tab';
+import { DEFAULT_NOTE_GROUPS, NoteGroup, filesInGroupFolder } from 'src/note_group';
 
-
-interface noteGroupSettings {
-  name: string;
-  notesFolder: string | null;
-  copilotPrompt: string;
-};
 
 interface ZettelkastenLLMToolsPluginSettings {
   openaiAPIKey: string;
   anthropicAPIKey: string;
   vectors: Array<StoredVector>;
-  allowPattern: string;
-  noteGroups: Array<noteGroupSettings>;
+  noteGroups: Array<NoteGroup>;
   contentMarker: string;
   embeddingsModelVersion?: string;
 };
-
-const DEFAULT_NOTE_GROUPS: Array<noteGroupSettings> = [{
-  name: "Permanent Notes",
-  notesFolder: null,
-  copilotPrompt: 'The following is a Zettelkasten note written by the user. The note should have 1. a clear title, 2. a single, clear thought stated briefly, 3. links to relevant ideas.\nSuggest revisions for this note. Be very brief and concise. Imitate their writing style. If you show an example of the suggested edits, wrap them in a <note></note> tag. If you want to suggest splitting into multiple notes, use more than one <note></note> tag.',
-}];
 
 const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   openaiAPIKey: '',
   anthropicAPIKey: '',
   vectors: [],
-  allowPattern: '.*',
   noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
   contentMarker: '',
   embeddingsModelVersion: defaultEmbeddingModel,
@@ -71,6 +58,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     this.fileFilter = new FileFilter();
     await this.loadSettings();
     this.vectorStore = new VectorStore(this);
+    this.indexVectorStores();
 
     // Generate embeddings for current note command
     this.addCommand({
@@ -115,25 +103,20 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       return this.semanticSearchTab;
     });
 
-    // Populate vector store command
-    const updateAllowPattern = (newAllowPattern: string) => {
-      this.settings.allowPattern = newAllowPattern;
-      this.saveSettings();
-    }
     let batchModel: BatchVectorStorageModal | undefined;
     this.addCommand({
       id: 'open-batch-generate-embeddings-modal',
       name: 'Open batch generate embeddings modal',
       callback: () => {
         if (batchModel === undefined) {
-          batchModel = new BatchVectorStorageModal(this.app, this, this.settings.allowPattern, this.filesForIndex, updateAllowPattern);
+          batchModel = new BatchVectorStorageModal(this.app, this, this.settings.noteGroups);
           batchModel.open();
         }
       }
     });
 
     this.addSettingTab(new ZettelkastenLLMToolsPluginSettingTab(this.app, this));
-    
+
     this.app.workspace.onLayoutReady(() => {
       this.initLeaf();
       if (this.copilotTab) {
@@ -211,33 +194,36 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     };
   }
 
-  async reindex() {
-    return generateAndStoreEmbeddings({
-      files: this.filteredFiles(),
-      app: this.app,
-      vectorStore: this.vectorStore,
-      contentMarker: this.settings.contentMarker,
-      llmClient: this.llmClient,
-    });
-  }
-
-  filesForIndex = (allowPttrn: string) => {
-    const allowGroups = allowPttrn.toLowerCase().split(',').filter((s) => s.length > 0).map((s) => s.split('*').filter((s) => s.length > 0));
-    return this.app.vault.getFiles().filter((file) => {
-      const path = file.path.toLowerCase();
-
-      return allowGroups.some((allowGroup) => {
-        return allowGroup.every((subString) => {
-          return path.includes(subString);
-        });
+  async indexVectorStores() {
+    // for now only the first note group will have a vector store
+    return Promise.all([this.settings.noteGroups[0]].map(noteGroup => {
+      const filesForNoteGroup = filesInGroupFolder(this.app, noteGroup);
+      return generateAndStoreEmbeddings({
+        files: filesForNoteGroup,
+        app: this.app,
+        vectorStore: this.vectorStore,
+        contentMarker: this.settings.contentMarker,
+        llmClient: this.llmClient,
       });
-    });
+    }));
   }
 
-  filteredFiles() {
-    return this.filesForIndex(
-      this.settings.allowPattern);
-  }
+  // filesForIndex = (allowPttrn: string) => {
+  //   const allowGroups = allowPttrn.toLowerCase().split(',').filter((s) => s.length > 0).map((s) => s.split('*').filter((s) => s.length > 0));
+  //   return this.app.vault.getFiles().filter((file) => {
+  //     const path = file.path.toLowerCase();
+
+  //     return allowGroups.some((allowGroup) => {
+  //       return allowGroup.every((subString) => {
+  //         return path.includes(subString);
+  //       });
+  //     });
+  //   });
+  // }
+
+  // filteredFiles() {
+  //   return filesInGroupFolder(this.app, this.settings.noteGroups[0]);
+  // }
 }
 
 class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
@@ -310,24 +296,13 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
               this.plugin.settings.embeddingsModelVersion = value;
               this.plugin.clearVectorArray();
               await this.plugin.saveSettings();
-              await this.plugin.reindex();
+              await this.plugin.indexVectorStores();
               await this.plugin.saveSettings();
             }
           );
           confirmModal.open();
         })
       });
-
-    new Setting(containerEl)
-      .setName('Allow pattern')
-      .setDesc('Which files to index')
-      .addText(text => text
-        .setPlaceholder('*')
-        .setValue(this.plugin.settings.allowPattern)
-        .onChange(async (value) => {
-          this.plugin.settings.allowPattern = value;
-          await this.plugin.saveSettings();
-        }));
 
     this.plugin.settings.noteGroups.forEach((noteGroup, i) => {
       // Create container div for this note group
@@ -339,7 +314,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
 
       // Add heading for group number
       const groupHeading = groupContainer.createEl('h3');
-      groupHeading.setText(`Note Group ${i + 1}`);
+      groupHeading.setText(`${i + 1} ${noteGroup.name}`);
       groupHeading.style.marginTop = '0';
       groupHeading.style.marginBottom = '10px';
 
@@ -357,27 +332,26 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
 
       // select folder
       new Setting(groupContainer)
-        .setName('Permanent Notes folder')
+        .setName('Note group folder')
         .setDesc('Select folder containing notes to index')
         .addDropdown(dropdown => {
           const NO_FOLDER_SELECTED = '(none selected)';
-          
+
           // Get all folders in vault
           const folders = this.app.vault.getAllLoadedFiles()
             .filter((f): f is TFolder => f instanceof TFolder)
             .map(f => f.path);
           // TODO: add filter for existing groups to ensure they aren't shown here
-  
-          // Add root folder option and "none selected"
-          // folders.unshift('/');
+
+          // Add "none selected" option
           folders.unshift(NO_FOLDER_SELECTED);
           folders.sort();
-  
+
           // Populate dropdown with folder paths
           folders.forEach(folder => {
             dropdown.addOption(folder, folder);
           });
-  
+
           dropdown.setValue(noteGroup.notesFolder ?? NO_FOLDER_SELECTED);
           dropdown.onChange(async (value) => {
             this.plugin.settings.noteGroups[i].notesFolder = value === NO_FOLDER_SELECTED ? null : value;
@@ -392,16 +366,52 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
         .addTextArea(text => {
           text.inputEl.style.width = '100%';
           text.inputEl.style.height = '150px';
+
+          let saveTimeout: NodeJS.Timeout;
+
           return text
             .setPlaceholder('')
             .setValue(noteGroup.copilotPrompt)
             .onChange(async (value) => {
-              this.plugin.settings.noteGroups[i].copilotPrompt = value;
-              await this.plugin.saveSettings();
+              // Clear existing timeout
+              if (saveTimeout) clearTimeout(saveTimeout);
+
+              // Set new timeout to save after 2 seconds of no typing
+              saveTimeout = setTimeout(async () => {
+                this.plugin.settings.noteGroups[i].copilotPrompt = value;
+                await this.plugin.saveSettings();
+              }, 2000);
             });
         });
-    })
 
+      if (i == 0) {
+        new Setting(groupContainer)
+          .setName('Indexed')
+          .setDesc('Indicates whether this note group is indexed by the vector store.')
+          .addToggle(toggle => {
+            toggle.setValue((i == 0) ? true : false);
+            toggle.setDisabled(true); // Make the checkbox non-interactive
+          });
+      };
+
+      new Setting(containerEl)
+        .setName('Create New Note Group')
+        .setDesc('Add a new note group to the settings.')
+        .addButton(button => {
+          button.setButtonText('Add Note Group')
+            .setCta()
+            .onClick(async () => {
+              const newNoteGroup = {
+                name: `New Note Group ${this.plugin.settings.noteGroups.length + 1}`,
+                notesFolder: null,
+                copilotPrompt: '',
+              };
+              this.plugin.settings.noteGroups.push(newNoteGroup);
+              await this.plugin.saveSettings();
+              this.display(); // Refresh the settings display to show the new group
+            });
+        });
+    });
   }
 }
 

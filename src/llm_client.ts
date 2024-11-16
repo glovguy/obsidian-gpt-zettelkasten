@@ -2,8 +2,6 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { MessageParam } from '@anthropic-ai/sdk/resources';
 
-let openai: any;
-
 interface OpenAIClientConfig {
   embeddings_model: EmbeddingModelNames;
   quantization_decimals: number;

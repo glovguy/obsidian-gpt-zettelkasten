@@ -1,32 +1,28 @@
 import { createRoot } from 'react-dom/client';
 import { Modal, App, Notice, TFile } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from '../main';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { NoteGroup, filesInGroupFolder } from './note_group';
+
 
 export default class BatchVectorStorageModal extends Modal {
   plugin: ZettelkastenLLMToolsPlugin;
-  allowPattern: string;
-  updateAllowPattern: (allowPattern: string) => void;
-  filesForIndex: (allowPattern: string) => TFile[];
+  noteGroups: Array<NoteGroup>;
 
   constructor(
-    app: App, 
-    plugin: ZettelkastenLLMToolsPlugin, 
-    allowPattern: string,
-    filesForIndex: (allowPattern: string) => TFile[],
-    updateAllowPattern: (allowPattern: string) => void,
+    app: App,
+    plugin: ZettelkastenLLMToolsPlugin,
+    noteGroups: Array<NoteGroup>,
   ) {
     super(app);
     this.plugin = plugin;
-    this.allowPattern = allowPattern;
-    this.filesForIndex = filesForIndex;
-    this.updateAllowPattern = updateAllowPattern;
+    this.noteGroups = noteGroups;
   }
 
   async onOpen() {
     const {contentEl} = this;
     const root = createRoot(contentEl.appendChild(document.createElement('div')));
-    root.render(<BatchSetup plugin={this.plugin} modal={this} filesForIndex={this.filesForIndex} allowPattern={this.allowPattern} updateAllowPattern={this.updateAllowPattern} />);
+    root.render(<BatchSetup plugin={this.plugin} modal={this} noteGroups={this.noteGroups} />);
   }
 
   onClose() {
@@ -35,47 +31,36 @@ export default class BatchVectorStorageModal extends Modal {
   }
 }
 
-const bannedChars = [
-  '\\', '=', '`', '@', '"', "'", '{', '}',
-  '+', '?', '!', '|', '$', '.', '!',
-  ':', '<', '>', '&', '%', '#'
-];
 const BatchSetup = ({
   plugin,
   modal,
-  filesForIndex,
-  allowPattern: _allowPattern,
-  updateAllowPattern,
+  noteGroups,
 }: {
   plugin: ZettelkastenLLMToolsPlugin,
   modal: BatchVectorStorageModal,
-  filesForIndex: (allowPattern: string) => TFile[],
-  allowPattern: string,
-  updateAllowPattern: (allowPattern: string) => void
+  noteGroups: Array<NoteGroup>,
 }) => {
-  const [allowPattern, setAllowPattern] = useState(_allowPattern);
-  const filteredFiles = filesForIndex(allowPattern);
+  const filteredFiles = filesInGroupFolder(plugin.app, noteGroups[0]);
+  const [numFilesNeedingIndexing, setNumFilesNeedingIndexing] = useState<number | undefined>();
+  const [selectedNoteGroupIndex, setSelectedNoteGroupIndex] = useState(0);
 
-  const stringCharacterFilter = (string: string) => {
-    const json_string = JSON.stringify(string);
-    let filteredString = '';
-    for (let i = 0; i < json_string.length; i++) {
-      let char = json_string[i];
-      if (!bannedChars.includes(char)) {
-        filteredString += char;
-      }
-    }
-    return filteredString;
-  }
-
-  const onAllowPatternChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const filteredValue = stringCharacterFilter(e.target.value);
-    setAllowPattern(filteredValue);
-    updateAllowPattern(filteredValue);
+  const onSelectedGroupChange = async (newGroupIndex: number) => {
+    setSelectedNoteGroupIndex(newGroupIndex);
   };
 
+  useEffect(() => {
+    const countFilesNeedingIndexing = async () => {
+      const count = (await Promise.all(
+        filteredFiles.map(async f => !(await plugin.vectorStore.hasFileBeenIndexed(f)))
+      )).filter(Boolean).length;
+      setNumFilesNeedingIndexing(count);
+    };
+
+    countFilesNeedingIndexing();
+  }, [selectedNoteGroupIndex]); // Re-run when these dependencies change
+
   const enqueueEmbeddings = () => {
-    plugin.reindex();
+    plugin.indexVectorStores();
     new Notice(`Enqueued ${filteredFiles.length} files for embedding`);
     modal.close();
   };
@@ -83,11 +68,16 @@ const BatchSetup = ({
   return (
     <div>
       <h1>Set up batch embedding</h1>
-      <span>Allow pattern: <input value={allowPattern} onChange={onAllowPatternChange}></input></span><p />
+      <span>Note Group: <select value={noteGroups[selectedNoteGroupIndex].name} onChange={(e) => console.log(parseInt(e.target.value))}>
+        {noteGroups.map((group, i) => (
+          <option key={group.name} value={i}>{group.name}</option>
+        ))}
+      </select></span><p />
       <button onClick={enqueueEmbeddings}>Start batch embedding</button>
       <div>
         <h3>Preview</h3>
-        <span>{filteredFiles.length} files match pattern</span>
+        <span>{filteredFiles.length} files match pattern</span><p></p>
+        <span>{(numFilesNeedingIndexing === undefined) ? '' : `(${numFilesNeedingIndexing} notes will be indexed)`}</span>
         {filteredFiles.map((file) => (
           <div key={file.path} className="batch-embedding-matching-file-preview-container" >
             <a onClick={() => plugin.app.workspace.openLinkText('', file.path)}><code>{file.path}</code></a>
