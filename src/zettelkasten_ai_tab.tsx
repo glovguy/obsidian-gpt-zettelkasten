@@ -65,6 +65,7 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
   const [response, setResponse] = useState('Click refresh to show suggestion');
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
   const [activeFile, setActiveFile] = useState(app.workspace.getActiveFile());
+  const [localSystemPrompt, setLocalSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [matchingNoteGroup, setMatchingNoteGroup] = useState<NoteGroup | undefined>(plugin.settings.noteGroups.find(group => {
     const initialActiveFile = app.workspace.getActiveFile();
     if (!group.notesFolder || !initialActiveFile) { return false; }
@@ -105,7 +106,7 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
       const tagCounts = (app.metadataCache as any).getTags(); // getTags works but is not documented
       const tags = tagCounts ? Object.keys(tagCounts) : null;
       const tagsMessage = tags ? `\ntags used in vault: ${tags.join(" ")}` : "";
-      const system_prompt = matchingNoteGroup?.copilotPrompt ?? DEFAULT_SYSTEM_PROMPT;
+      const system_prompt = matchingNoteGroup?.copilotPrompt ?? localSystemPrompt;
 
       const msg = await plugin.anthropicClient.createMessage(
         system_prompt,
@@ -126,7 +127,21 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
   return (
     <div>
       <h1>Copilot Note Suggestions</h1>
-      {(matchingNoteGroup !== undefined) ? (<p>In group <i>{matchingNoteGroup.name}</i></p>) : (<p>(Not part of any note group.)</p>)}<br />
+      {matchingNoteGroup !== undefined ? (
+        <p><span role="img" aria-label="folder">📁</span> {matchingNoteGroup.name}</p>
+      ) : (
+        <>
+          <p><i>(Not part of any note group)</i></p>
+          <textarea
+            defaultValue={DEFAULT_SYSTEM_PROMPT}
+            onChange={(e) => setLocalSystemPrompt(e.target.value)}
+            rows={10}
+            cols={44}
+          />
+          <br />
+        </>
+      )}
+      <br />
       <button onClick={() => populateCopilotSuggest()}>Suggest Revisions</button><br />
       <hr />
       {isLoadingResponse && <span>Loading...</span>}<p></p>
