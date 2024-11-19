@@ -1,7 +1,6 @@
 import { TFile } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from 'main';
 import { shaForString } from './utils';
-import { filterMetaData } from './semantic_search';
 
 export interface StoredVector {
   linktext: string;
@@ -78,7 +77,7 @@ export class VectorStore {
   async upsertVector(file: TFile): Promise<StoredVector> {
     const { linktext } = this.plugin.linkTextForFile(file);
     const { llmClient } = this.plugin;
-    const filteredLines = filterMetaData(this.plugin.settings.contentMarker, await this.plugin.app.vault.cachedRead(file));
+    const filteredLines = await this.plugin.app.vault.cachedRead(file);
     if (filteredLines.length === 0) {
       throw new Error("Error extracting text for [[" + linktext + "]]");
     }
@@ -133,7 +132,7 @@ export class VectorStore {
   }
 
   async hasFileBeenIndexed(file: TFile): Promise<boolean> {
-    const filteredLines = filterMetaData(this.plugin.settings.contentMarker, await this.plugin.app.vault.cachedRead(file));
+    const filteredLines = await this.plugin.app.vault.cachedRead(file);
     if (filteredLines.length === 0) {
       return false;
     }

@@ -6,7 +6,7 @@ import { TFile, getIcon } from 'obsidian';
 import { Icon } from './icon';
 import ZettelkastenLLMToolsPlugin from '../main';
 import SemanticSearchResults from './semantic_search_results';
-import { allTags, filterMetaData } from './semantic_search';
+import { allTags } from './semantic_search';
 import { StoredVector, VectorSearchResult } from './vector_storage';
 import { VIEW_TYPE_AI_SEARCH } from './constants';
 import { App } from 'obsidian';
@@ -108,7 +108,7 @@ const SemanticSearchTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, a
         return;
       }
       const fileText = await app.vault.cachedRead(existingFile);
-      match['content'] = filterMetaData(plugin.settings.contentMarker, fileText);
+      match['content'] = fileText;
       match['tags'] = allTags(fileText);
     }));
 

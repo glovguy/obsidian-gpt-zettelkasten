@@ -32,7 +32,6 @@ interface ZettelkastenLLMToolsPluginSettings {
   anthropicAPIKey: string;
   vectors: Array<StoredVector>;
   noteGroups: Array<NoteGroup>;
-  contentMarker: string;
   embeddingsModelVersion?: string;
 };
 
@@ -41,7 +40,6 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   anthropicAPIKey: '',
   vectors: [],
   noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
-  contentMarker: '',
   embeddingsModelVersion: defaultEmbeddingModel,
 };
 
@@ -75,7 +73,6 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
 
           generateAndStoreEmbeddings({
             vectorStore: this.vectorStore,
-            contentMarker: this.settings.contentMarker,
             files: [activeFile],
             app: this.app,
             llmClient: this.llmClient,
@@ -202,7 +199,6 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
         files: filesForNoteGroup,
         app: this.app,
         vectorStore: this.vectorStore,
-        contentMarker: this.settings.contentMarker,
         llmClient: this.llmClient,
       });
     }));
@@ -262,17 +258,6 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.anthropicAPIKey)
         .onChange(async (value) => {
           this.plugin.settings.anthropicAPIKey = value;
-          await this.plugin.saveSettings();
-        }));
-
-    new Setting(containerEl)
-      .setName('Content marker')
-      .setDesc('Enter the markdown heading that marks the start of the content you want to use for semantic search. Leave blank to use the entire note.')
-      .addText(text => text
-        .setPlaceholder('# Body')
-        .setValue(this.plugin.settings.contentMarker)
-        .onChange(async (value) => {
-          this.plugin.settings.contentMarker = value;
           await this.plugin.saveSettings();
         }));
 

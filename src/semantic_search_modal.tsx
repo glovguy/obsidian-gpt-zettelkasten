@@ -1,7 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { Modal, App, TFile } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from '../main';
-import { filterMetaData } from './semantic_search';
 import SemanticSearchResults from './semantic_search_results';
 
 export default class SemanticSearchModal extends Modal {
@@ -32,7 +31,7 @@ export default class SemanticSearchModal extends Modal {
         return;
       }
 
-      match['content'] = filterMetaData(this.plugin.settings.contentMarker, await this.app.vault.cachedRead(existingFile));
+      match['content'] = await this.app.vault.cachedRead(existingFile);
     }));
 
     contentEl.setText('');

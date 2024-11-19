@@ -3,7 +3,17 @@ import { VectorStore } from './vector_storage';
 import { shaForString } from './utils';
 import { OpenAIClient } from './llm_client';
 
-export const generateAndStoreEmbeddings = async ({ files, app, vectorStore, contentMarker, llmClient }: { files: Array<TFile>, app: App, vectorStore: VectorStore, contentMarker: string | null, llmClient: OpenAIClient }): Promise<any> => {
+export const generateAndStoreEmbeddings = async ({
+  files,
+  app,
+  vectorStore,
+  llmClient
+}: {
+  files: Array<TFile>,
+  app: App,
+  vectorStore: VectorStore,
+  llmClient: OpenAIClient
+}): Promise<any> => {
   console.log(`Generating embeddings for ${files.length} files...`);
   const maxConcurrency = 2;
   console.log(`Gating requests to maximum ${maxConcurrency} at a time`);
@@ -11,7 +21,7 @@ export const generateAndStoreEmbeddings = async ({ files, app, vectorStore, cont
   files.forEach(async (file: TFile) => {
     const linktext = app.metadataCache.fileToLinktext(file, file.path)
     const path = file.path;
-    const filteredLines = filterMetaData(contentMarker, await app.vault.cachedRead(file));
+    const filteredLines = await app.vault.cachedRead(file);
     if (filteredLines.length === 0) {
       console.error("Error extracting text for [[" + linktext + "]]");
       return;
@@ -35,29 +45,6 @@ export const generateAndStoreEmbeddings = async ({ files, app, vectorStore, cont
   return concurrencyManager.done;
 };
 
-export const filterMetaData = function(contentMarker: string | null, text: string) {
-  if (contentMarker == null) {
-    return text;
-  }
-  let currentDepth = contentMarker ? contentMarker.split('#').length-1 : 0;
-  let recording = true;
-  const lines = text.split('\n');
-  const filteredLines = lines.filter((line) => {
-    if (contentMarker && line === this.contentMarker) {
-      recording = true;
-      return false;
-    } else if (line.startsWith('#') && line.contains('# ')) {
-      const depth = line.split('#').length - 1;
-      if (depth <= currentDepth) {
-        recording = false;
-        return false;
-      }
-    }
-    return recording;
-  });
-  return filteredLines.join('\n');
-}
-
 export const allTags = function(text: string) {
   const tagRegex = /(#[^\s#\]\[؜]+)[\s$]/g;
   const matches = [...text.matchAll(tagRegex)];
@@ -66,20 +53,6 @@ export const allTags = function(text: string) {
 }
 
 export class FileFilter {
-  contentMarker: string | null;
-
-  constructor() {
-    this.contentMarker = null;
-  }
-
-  setContentMarker(contentMarker: string) {
-    this.contentMarker = contentMarker;
-  }
-
-  filterOutMetaData(text: string) {
-    filterMetaData(this.contentMarker, text);
-  };
-
   allTags(text: string) {
     const tagRegex = /(#[^\s#\]\[؜]+)[\s$]/g;
     const matches = [...text.matchAll(tagRegex)];
