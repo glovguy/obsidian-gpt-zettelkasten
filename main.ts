@@ -203,23 +203,6 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       });
     }));
   }
-
-  // filesForIndex = (allowPttrn: string) => {
-  //   const allowGroups = allowPttrn.toLowerCase().split(',').filter((s) => s.length > 0).map((s) => s.split('*').filter((s) => s.length > 0));
-  //   return this.app.vault.getFiles().filter((file) => {
-  //     const path = file.path.toLowerCase();
-
-  //     return allowGroups.some((allowGroup) => {
-  //       return allowGroup.every((subString) => {
-  //         return path.includes(subString);
-  //       });
-  //     });
-  //   });
-  // }
-
-  // filteredFiles() {
-  //   return filesInGroupFolder(this.app, this.settings.noteGroups[0]);
-  // }
 }
 
 class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
@@ -441,33 +424,37 @@ class EmbeddingsModelOverwriteConfirmModal extends Modal {
 
   async onOpen() {
     const { contentEl } = this;
-    contentEl.setText(`Changing the embedding model used means throwing out existing vectors and re-indexing using the new model. Please confirm that you would like to trigger this re-indexing.\nThis will delete ${this.plugin.settings.vectors.length} vectors.\n\n`);
-    contentEl.appendChild(this.confirmButton());
-    contentEl.appendChild(this.cancelButton());
+
+    contentEl.createEl("h3", { text: "Change Embeddings Model" });
+    contentEl.createEl("p", {
+      text: "Changing the embedding model used means throwing out existing vectors and re-indexing using the new model. Please confirm that you would like to trigger this re-indexing."
+    });
+    contentEl.createEl("p", {
+      text: `This will delete ${this.plugin.settings.vectors.length} vectors.`
+    });
+
+    const buttonContainer = contentEl.createDiv();
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.justifyContent = "flex-end";
+    buttonContainer.style.gap = "10px";
+    buttonContainer.style.marginTop = "20px";
+
+    const confirmButton = buttonContainer.createEl("button", {
+      text: "Confirm",
+      cls: "mod-warning"
+    });
+    confirmButton.addEventListener("click", () => {
+      this.confirmClicked = true;
+      this.close();
+    });
+
+    const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
+    cancelButton.addEventListener("click", () => this.close());
   }
 
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
     this.confirmCallback(this.confirmClicked);
-  }
-
-  private confirmButton(): HTMLButtonElement {
-    const confirmButton = document.createElement('button');
-    confirmButton.textContent = 'Confirm';
-    confirmButton.addEventListener('click', () => {
-      this.confirmClicked = true;
-      this.close();
-    });
-    return confirmButton;
-  }
-
-  private cancelButton(): HTMLButtonElement {
-    const cancelButton = document.createElement('button');
-    cancelButton.textContent = 'Cancel';
-    cancelButton.addEventListener('click', () => {
-      this.close();
-    });
-    return cancelButton;
   }
 }
