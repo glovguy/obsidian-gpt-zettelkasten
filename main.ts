@@ -306,17 +306,30 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
           const NO_FOLDER_SELECTED = '(none selected)';
 
           // Get all folders in vault
-          const folders = this.app.vault.getAllLoadedFiles()
+          const allFolders = this.app.vault.getAllLoadedFiles()
             .filter((f): f is TFolder => f instanceof TFolder)
             .map(f => f.path);
-          // TODO: add filter for existing groups to ensure they aren't shown here
+
+          // Filter out folders that are already used by other note groups
+          const usedFolders = new Set(
+            this.plugin.settings.noteGroups
+              .filter((g, idx) => idx !== i && g.notesFolder) // Exclude current group
+              .map(g => g.notesFolder!)
+          );
+
+          const selectableFolders = allFolders.filter(folder => {
+            // Keep folder if it's not used and none of its parent folders are used
+            return !Array.from(usedFolders).some(usedFolder =>
+              folder === usedFolder || folder.startsWith(usedFolder + '/')
+            );
+          });
 
           // Add "none selected" option
-          folders.unshift(NO_FOLDER_SELECTED);
-          folders.sort();
+          selectableFolders.unshift(NO_FOLDER_SELECTED);
+          selectableFolders.sort();
 
           // Populate dropdown with folder paths
-          folders.forEach(folder => {
+          selectableFolders.forEach(folder => {
             dropdown.addOption(folder, folder);
           });
 
