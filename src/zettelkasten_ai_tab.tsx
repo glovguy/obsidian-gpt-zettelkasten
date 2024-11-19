@@ -132,12 +132,15 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
       ) : (
         <>
           <p><i>(Not part of any note group)</i></p>
-          <textarea
-            defaultValue={DEFAULT_SYSTEM_PROMPT}
-            onChange={(e) => setLocalSystemPrompt(e.target.value)}
-            rows={10}
-            cols={44}
-          />
+          <label>
+            Custom System Prompt:
+            <textarea
+              defaultValue={DEFAULT_SYSTEM_PROMPT}
+              onChange={(e) => setLocalSystemPrompt(e.target.value)}
+              rows={10}
+              cols={44}
+            />
+          </label>
           <br />
         </>
       )}

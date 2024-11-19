@@ -314,7 +314,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
 
       // Add heading for group number
       const groupHeading = groupContainer.createEl('h3');
-      groupHeading.setText(`${i + 1} ${noteGroup.name}`);
+      groupHeading.setText(`${i + 1}. ${noteGroup.name}`);
       groupHeading.style.marginTop = '0';
       groupHeading.style.marginBottom = '10px';
 
@@ -384,34 +384,61 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
             });
         });
 
-      if (i == 0) {
-        new Setting(groupContainer)
-          .setName('Indexed')
-          .setDesc('Indicates whether this note group is indexed by the vector store.')
-          .addToggle(toggle => {
-            toggle.setValue((i == 0) ? true : false);
-            toggle.setDisabled(true); // Make the checkbox non-interactive
-          });
-      };
+      new Setting(groupContainer)
+        .setName(`${(i == 0) ? '' : 'Not'} Indexed`)
+        .setDesc('This note group ' + (i == 0 ? 'is' : 'is NOT') + ' indexed by the vector store. (Only the first note group is indexed.)');
 
-      new Setting(containerEl)
-        .setName('Create New Note Group')
-        .setDesc('Add a new note group to the settings.')
-        .addButton(button => {
-          button.setButtonText('Add Note Group')
-            .setCta()
-            .onClick(async () => {
-              const newNoteGroup = {
-                name: `New Note Group ${this.plugin.settings.noteGroups.length + 1}`,
-                notesFolder: null,
-                copilotPrompt: '',
-              };
-              this.plugin.settings.noteGroups.push(newNoteGroup);
-              await this.plugin.saveSettings();
-              this.display(); // Refresh the settings display to show the new group
-            });
-        });
+      if (i !== 0 && this.plugin.settings.noteGroups.length > 1) {
+        new Setting(groupContainer)
+          .setName('Delete Note Group')
+          .setDesc('Remove this note group.')
+          .addButton(button => {
+            button.setButtonText('Delete')
+              .setWarning()
+              .onClick(async () => {
+                const modal = new Modal(this.app);
+                modal.contentEl.createEl("h3", { text: "Delete Note Group" });
+                modal.contentEl.createEl("p", { text: "Are you sure you want to delete this note group? This will only remove the group's settings. Your notes and folders will not be affected." });
+
+                const buttonContainer = modal.contentEl.createDiv();
+                buttonContainer.style.display = "flex";
+                buttonContainer.style.justifyContent = "flex-end";
+                buttonContainer.style.gap = "10px";
+
+                const confirmButton = buttonContainer.createEl("button", { text: "Delete", cls: "mod-warning" });
+                confirmButton.addEventListener("click", async () => {
+                  this.plugin.settings.noteGroups.splice(i, 1);
+                  await this.plugin.saveSettings();
+                  this.display();
+                  modal.close();
+                });
+
+                const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
+                cancelButton.addEventListener("click", () => modal.close());
+
+                modal.open();
+              });
+          });
+      }
     });
+
+    new Setting(containerEl)
+      .setName('Create New Note Group')
+      .setDesc('Add a new note group to the settings.')
+      .addButton(button => {
+        button.setButtonText('Add Note Group')
+          .setCta()
+          .onClick(async () => {
+            const newNoteGroup = {
+              name: `New Note Group ${this.plugin.settings.noteGroups.length + 1}`,
+              notesFolder: null,
+              copilotPrompt: '',
+            };
+            this.plugin.settings.noteGroups.push(newNoteGroup);
+            await this.plugin.saveSettings();
+            this.display(); // Refresh the settings display to show the new group
+          });
+      });
   }
 }
 
