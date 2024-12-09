@@ -1,6 +1,6 @@
 {
 	"name": "zettelkasten-llm-tools",
-	"version": "1.3.0",
+	"version": "1.4.1",
 	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
@@ -13,8 +13,16 @@
 		"plugin",
 		"zettelkasten",
 		"openai",
+		"anthropic",
+		"claude",
 		"semantic search",
-		"ai"
+		"ai",
+		"note-taking",
+		"embeddings",
+		"vector-search",
+		"llm",
+		"copilot",
+		"assistant"
 	],
 	"author": "Karl Smith",
 	"license": "MIT",
