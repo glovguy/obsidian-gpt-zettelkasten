@@ -228,7 +228,8 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
       .addText(text => text
         .setPlaceholder('Enter your API key')
         .setValue(this.plugin.settings.openaiAPIKey)
-        .onChange(async (value) => {
+        .then(text => { text.inputEl.type = 'password'; })
+        .onChange(async (value: string) => {
           this.plugin.settings.openaiAPIKey = value;
           await this.plugin.saveSettings();
         }));
@@ -239,7 +240,8 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
       .addText(text => text
         .setPlaceholder('Enter your API key')
         .setValue(this.plugin.settings.anthropicAPIKey)
-        .onChange(async (value) => {
+        .then(text => { text.inputEl.type = 'password'; })
+        .onChange(async (value: string) => {
           this.plugin.settings.anthropicAPIKey = value;
           await this.plugin.saveSettings();
         }));
