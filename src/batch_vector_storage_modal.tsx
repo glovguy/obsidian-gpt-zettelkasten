@@ -68,11 +68,7 @@ const BatchSetup = ({
   return (
     <div>
       <h1>Set up batch embedding</h1>
-      <span>Note Group: <select value={noteGroups[selectedNoteGroupIndex].name} onChange={(e) => console.log(parseInt(e.target.value))}>
-        {noteGroups.map((group, i) => (
-          <option key={group.name} value={i}>{group.name}</option>
-        ))}
-      </select></span><p />
+      <span>Note Group: {noteGroups[0].name}</span><p />
       <button onClick={enqueueEmbeddings}>Start batch embedding</button>
       <div>
         <h3>Preview</h3>

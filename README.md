@@ -14,12 +14,12 @@ Zettelkasten note taking powered by Large Language Models.
 ## Installation through Community Plugins Registry
 
 - Navigate to Community Plugins tab in Obsidian
-- Click "Browse" \
+- Click "Browse"
 - Search for "Zettelkasten LLM Tools"
 - Select to install plugin
 - Navigate to Community Plugins tab in Obsidian
 - Select "Options" icon next to "Zettelkasten LLM Tools"
-- Fill in OpenAI API Key
+- Fill in OpenAI API key and Anthropic API key
 
 ## How to use
 
