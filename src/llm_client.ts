@@ -7,26 +7,14 @@ interface OpenAIClientConfig {
   quantization_decimals: number;
 }
 
-// interface EmbeddingsModels {
-//   v2: string;
-//   v3_small: string;
-// }
-// export const availableEmbeddingsModels: EmbeddingsModels = {
-//   "v2": "text-embedding-ada-002",
-//   "v3_small": "text-embedding-3-small"
-// };
-// export type EmbeddingModelNames = keyof typeof availableEmbeddingsModels;
-// export const defaultEmbeddingModel = "v3_small"; // default for new vector stores
-// export const unlabelledEmbeddingModel = "v2"; // version used if vector store existed prior to label
 export const OPENAI_PROVIDER = 'openai';
 export const ANTHROPIC_PROVIDER = 'anthropic';
 
-export type EmbeddingsProvider = typeof OPENAI_PROVIDER | typeof ANTHROPIC_PROVIDER;
+export type EmbeddingsProvider = typeof OPENAI_PROVIDER;
 
 export const OPENAI_EMBEDDING_3_SMALL = 'text-embedding-3-small';
 export const OPENAI_EMBEDDING_3_LARGE = 'text-embedding-3-large';
-export const ANTHROPIC_CLAUDE_3_HAIKU = 'claude-3-haiku';
-export type EmbeddingModelNames = typeof OPENAI_EMBEDDING_3_SMALL | typeof OPENAI_EMBEDDING_3_LARGE | typeof ANTHROPIC_CLAUDE_3_HAIKU;
+export type EmbeddingModelNames = typeof OPENAI_EMBEDDING_3_SMALL | typeof OPENAI_EMBEDDING_3_LARGE;
 
 interface EmbeddingModel {
   provider: EmbeddingsProvider;
@@ -48,12 +36,6 @@ export function availableEmbeddingModels(openAIKey: string, anthropicKey: string
       name: OPENAI_EMBEDDING_3_LARGE,
       displayName: 'OpenAI: text-embedding-3-large',
       available: !!openAIKey,
-    },
-    {
-      provider: ANTHROPIC_PROVIDER,
-      name: ANTHROPIC_CLAUDE_3_HAIKU,
-      displayName: 'Anthropic: claude-3-haiku',
-      available: !!anthropicKey,
     },
   ];
 }
@@ -123,4 +105,23 @@ export class OpenAIClient {
       )
     )[0];
   };
+}
+
+export async function generateEmbeddings(
+  text: string,
+  modelName: EmbeddingModelNames,
+  openaiClient?: OpenAIClient,
+): Promise<number[]> {
+  if (!text) {
+    throw new Error('No text provided for embedding generation');
+  }
+
+  switch (modelName) {
+    case OPENAI_EMBEDDING_3_SMALL:
+    case OPENAI_EMBEDDING_3_LARGE:
+      if (!openaiClient) throw new Error('OpenAI client not initialized');
+      return await openaiClient.generateOpenAiEmbeddings([text]);
+    default:
+      throw new Error(`Unknown embedding model: ${modelName}`);
+  }
 }

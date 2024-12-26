@@ -243,19 +243,6 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    // // Create container div for embeddings settings
-    // const embeddingsContainer = containerEl.createDiv('embeddings-settings-container');
-    // embeddingsContainer.style.border = '1px solid var(--background-modifier-border)';
-    // embeddingsContainer.style.padding = '10px';
-    // embeddingsContainer.style.marginBottom = '20px';
-    // embeddingsContainer.style.borderRadius = '5px';
-
-    // // Add heading
-    // const embeddingsHeading = embeddingsContainer.createEl('h3');
-    // embeddingsHeading.setText('Embeddings Configuration');
-    // embeddingsHeading.style.marginTop = '0';
-    // embeddingsHeading.style.marginBottom = '10px';
-
     new Setting(containerEl)
       .setName('Model version for embeddings')
       .setDesc('Select the model version you want to use for vector embeddings.')
