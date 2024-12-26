@@ -7,21 +7,62 @@ interface OpenAIClientConfig {
   quantization_decimals: number;
 }
 
-interface EmbeddingsModels {
-  v2: string;
-  v3_small: string;
+// interface EmbeddingsModels {
+//   v2: string;
+//   v3_small: string;
+// }
+// export const availableEmbeddingsModels: EmbeddingsModels = {
+//   "v2": "text-embedding-ada-002",
+//   "v3_small": "text-embedding-3-small"
+// };
+// export type EmbeddingModelNames = keyof typeof availableEmbeddingsModels;
+// export const defaultEmbeddingModel = "v3_small"; // default for new vector stores
+// export const unlabelledEmbeddingModel = "v2"; // version used if vector store existed prior to label
+export const OPENAI_PROVIDER = 'openai';
+export const ANTHROPIC_PROVIDER = 'anthropic';
+
+export type EmbeddingsProvider = typeof OPENAI_PROVIDER | typeof ANTHROPIC_PROVIDER;
+
+export const OPENAI_EMBEDDING_3_SMALL = 'text-embedding-3-small';
+export const OPENAI_EMBEDDING_3_LARGE = 'text-embedding-3-large';
+export const ANTHROPIC_CLAUDE_3_HAIKU = 'claude-3-haiku';
+export type EmbeddingModelNames = typeof OPENAI_EMBEDDING_3_SMALL | typeof OPENAI_EMBEDDING_3_LARGE | typeof ANTHROPIC_CLAUDE_3_HAIKU;
+
+interface EmbeddingModel {
+  provider: EmbeddingsProvider;
+  name: EmbeddingModelNames;
+  displayName: string;
+  available: boolean;
 }
-export const availableEmbeddingsModels: EmbeddingsModels = {
-  "v2": "text-embedding-ada-002",
-  "v3_small": "text-embedding-3-small"
-};
-export type EmbeddingModelNames = keyof typeof availableEmbeddingsModels;
-export const defaultEmbeddingModel = "v3_small"; // default for new vector stores
-export const unlabelledEmbeddingModel = "v2"; // version used if vector store existed prior to label
+
+export function availableEmbeddingModels(openAIKey: string, anthropicKey: string): EmbeddingModel[] {
+  return [
+    {
+      provider: OPENAI_PROVIDER,
+      name: OPENAI_EMBEDDING_3_SMALL,
+      displayName: 'OpenAI: text-embedding-3-small',
+      available: !!openAIKey,
+    },
+    {
+      provider: OPENAI_PROVIDER,
+      name: OPENAI_EMBEDDING_3_LARGE,
+      displayName: 'OpenAI: text-embedding-3-large',
+      available: !!openAIKey,
+    },
+    {
+      provider: ANTHROPIC_PROVIDER,
+      name: ANTHROPIC_CLAUDE_3_HAIKU,
+      displayName: 'Anthropic: claude-3-haiku',
+      available: !!anthropicKey,
+    },
+  ];
+}
+
+export const unlabelledEmbeddingModel = OPENAI_EMBEDDING_3_SMALL;
 export const quantizationDecimals = 3;
 
 const defaultOpenAIConfig = (): OpenAIClientConfig => ({
-  embeddings_model: defaultEmbeddingModel,
+  embeddings_model: OPENAI_EMBEDDING_3_SMALL,
   quantization_decimals: quantizationDecimals,
 });
 
@@ -66,9 +107,9 @@ export class OpenAIClient {
   }
 
   async generateOpenAiEmbeddings(docs: Array<string>) {
-    const model = availableEmbeddingsModels[this.config.embeddings_model];
+    const model = this.config.embeddings_model;
     let dimensions;
-    if (model === availableEmbeddingsModels['v3_small']) {
+    if (model === OPENAI_EMBEDDING_3_SMALL) {
       dimensions = 256;
     }
     const embeddings = await this.openai.embeddings.create({

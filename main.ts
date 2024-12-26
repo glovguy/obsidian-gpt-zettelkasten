@@ -11,12 +11,10 @@ import {
 } from 'obsidian';
 import {
   OpenAIClient,
-  defaultEmbeddingModel,
   unlabelledEmbeddingModel,
-  availableEmbeddingsModels,
+  availableEmbeddingModels,
   AnthropicClient,
 } from './src/llm_client';
-import type { EmbeddingModelNames } from './src/llm_client';
 import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
 import SemanticSearchModal from './src/semantic_search_modal';
@@ -40,7 +38,6 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   anthropicAPIKey: '',
   vectors: [],
   noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
-  embeddingsModelVersion: defaultEmbeddingModel,
 };
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
@@ -246,32 +243,55 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
+    // // Create container div for embeddings settings
+    // const embeddingsContainer = containerEl.createDiv('embeddings-settings-container');
+    // embeddingsContainer.style.border = '1px solid var(--background-modifier-border)';
+    // embeddingsContainer.style.padding = '10px';
+    // embeddingsContainer.style.marginBottom = '20px';
+    // embeddingsContainer.style.borderRadius = '5px';
+
+    // // Add heading
+    // const embeddingsHeading = embeddingsContainer.createEl('h3');
+    // embeddingsHeading.setText('Embeddings Configuration');
+    // embeddingsHeading.style.marginTop = '0';
+    // embeddingsHeading.style.marginBottom = '10px';
+
     new Setting(containerEl)
       .setName('Model version for embeddings')
       .setDesc('Select the model version you want to use for vector embeddings.')
       .addDropdown(dropdown => {
-        Object.keys(availableEmbeddingsModels).forEach((modelName: EmbeddingModelNames) => {
-          dropdown.addOption(availableEmbeddingsModels[modelName], availableEmbeddingsModels[modelName]);
+        const availableModels = availableEmbeddingModels(
+          this.plugin.settings.openaiAPIKey,
+          this.plugin.settings.anthropicAPIKey
+        );
+
+        availableModels.forEach(model => {
+          if (model.available) {
+            dropdown.addOption(model.name, model.displayName);
+          }
         });
-        dropdown.setValue(this.plugin.settings.embeddingsModelVersion || defaultEmbeddingModel);
+
+        dropdown.setValue(this.plugin.settings.embeddingsModelVersion || '');
         dropdown.onChange(async (value) => {
           const confirmModal = new EmbeddingsModelOverwriteConfirmModal(
             this.app,
             this.plugin,
             async (confirmWasClicked) => {
               if (!confirmWasClicked) {
-                dropdown.setValue(this.plugin.settings.embeddingsModelVersion || defaultEmbeddingModel);
+                dropdown.setValue(this.plugin.settings.embeddingsModelVersion || '');
                 return;
               }
-              this.plugin.settings.embeddingsModelVersion = value;
-              this.plugin.clearVectorArray();
-              await this.plugin.saveSettings();
-              await this.plugin.indexVectorStores();
-              await this.plugin.saveSettings();
+              if (value !== '') {
+                this.plugin.settings.embeddingsModelVersion = value;
+                this.plugin.clearVectorArray();
+                await this.plugin.saveSettings();
+                await this.plugin.indexVectorStores();
+                await this.plugin.saveSettings();
+              }
             }
           );
           confirmModal.open();
-        })
+        });
       });
 
     this.plugin.settings.noteGroups.forEach((noteGroup, i) => {
