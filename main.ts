@@ -289,7 +289,23 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    new Setting(containerEl)
+    const statusEl = containerEl.createEl('div', { cls: 'embedding-status' });
+
+    new Setting(statusEl)
+      .setName('Enable Embeddings')
+      .setDesc('Toggle embeddings functionality on/off')
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.plugin.settings.embeddingsEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.embeddingsEnabled = value;
+            await this.plugin.saveSettings();
+            // Refresh the settings display to update status
+            this.display();
+          });
+      });
+
+    new Setting(statusEl)
       .setName('Model version for embeddings')
       .setDesc('Select the model version you want to use for vector embeddings.')
       .addDropdown(dropdown => {
@@ -325,22 +341,6 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
           confirmModal.open();
         });
       });
-
-    new Setting(containerEl)
-      .setName('Enable Embeddings')
-      .setDesc('Toggle embeddings functionality on/off')
-      .addToggle(toggle => {
-        toggle
-          .setValue(this.plugin.settings.embeddingsEnabled)
-          .onChange(async (value) => {
-            this.plugin.settings.embeddingsEnabled = value;
-            await this.plugin.saveSettings();
-            // Refresh the settings display to update status
-            this.display();
-          });
-      });
-
-    const statusEl = containerEl.createEl('div', { cls: 'embedding-status' });
 
     if (this.plugin.settings.embeddingsEnabled) {
       const status = this.plugin.indexingStatus === INDEXING_STATUS
@@ -387,6 +387,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
 
     // Add some basic styles
     statusEl.style.marginTop = '1em';
+    statusEl.style.marginBottom = '1em';
     statusEl.style.padding = '1em';
     statusEl.style.backgroundColor = 'var(--background-secondary)';
     statusEl.style.borderRadius = '4px';
