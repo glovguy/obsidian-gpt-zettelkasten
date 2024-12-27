@@ -24,13 +24,15 @@ import { VIEW_TYPE_AI_COPILOT, VIEW_TYPE_AI_SEARCH } from './src/constants';
 import SemanticSearchTab from 'src/semantic_search_tab';
 import { DEFAULT_NOTE_GROUPS, NoteGroup, filesInGroupFolder } from 'src/note_group';
 
-
+const IDLE_STATUS = 'idle';
+const INDEXING_STATUS = 'indexing';
 interface ZettelkastenLLMToolsPluginSettings {
   openaiAPIKey: string;
   anthropicAPIKey: string;
   vectors: Array<StoredVector>;
   noteGroups: Array<NoteGroup>;
   embeddingsModelVersion?: string;
+  embeddingsEnabled: boolean;
 };
 
 const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
@@ -38,6 +40,7 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   anthropicAPIKey: '',
   vectors: [],
   noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
+  embeddingsEnabled: false,
 };
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
@@ -48,12 +51,16 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   semanticSearchTab: SemanticSearchTab;
   llmClient: OpenAIClient;
   anthropicClient: AnthropicClient;
+  indexingStatus: typeof IDLE_STATUS | typeof INDEXING_STATUS;
+  lastIndexedCount: number;
 
   async onload() {
     this.fileFilter = new FileFilter();
     await this.loadSettings();
     this.vectorStore = new VectorStore(this);
-    this.indexVectorStores();
+    this.indexingStatus = IDLE_STATUS;
+    this.lastIndexedCount = this.settings.vectors.length;
+    // this.indexVectorStores();
 
     // Generate embeddings for current note command
     this.addCommand({
@@ -62,18 +69,28 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       callback: async () => {
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (activeView) {
-          const editor = activeView.editor;
-          const text = editor.getValue();
-
           const activeFile = this.app.workspace.getActiveFile();
           if (!activeFile) { return; }
 
-          generateAndStoreEmbeddings({
-            vectorStore: this.vectorStore,
-            files: [activeFile],
-            app: this.app,
-            llmClient: this.llmClient,
-          });
+          try {
+            this.indexingStatus = INDEXING_STATUS;
+            await this.saveSettings();
+            const concurrencyManager = await generateAndStoreEmbeddings({
+              vectorStore: this.vectorStore,
+              files: [activeFile],
+              app: this.app,
+              llmClient: this.llmClient,
+              notify: (numCompleted: number) => {
+                console.info(`Indexed ${numCompleted} files`);
+                this.lastIndexedCount = numCompleted;
+                this.saveSettings();
+              }
+            });
+            await concurrencyManager.done();
+          } finally {
+            this.indexingStatus = IDLE_STATUS;
+            await this.saveSettings();
+          }
         }
       }
     });
@@ -163,7 +180,15 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     if (!loadedSettings?.embeddingsModelVersion && this.settings.vectors.length !== 0) {
       // if the model version was not set in settings, but vectors exist
       this.settings.embeddingsModelVersion = unlabelledEmbeddingModel;
+      this.settings.embeddingsEnabled = true;
     }
+
+    if (this.settings.vectors.length !== 0) {
+      this.lastIndexedCount = this.settings.vectors.length;
+    }
+
+    this.indexVectorStores();
+
     this.llmClient = new OpenAIClient(this.settings.openaiAPIKey);
     this.anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
   }
@@ -171,6 +196,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   clearVectorArray() {
     this.settings.vectors = [];
     this.vectorStore = new VectorStore(this);
+    this.lastIndexedCount = 0;
   }
 
   async saveSettings() {
@@ -189,16 +215,36 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   }
 
   async indexVectorStores() {
+    if (!this.settings.embeddingsEnabled || this.indexingStatus === INDEXING_STATUS) {
+      return;
+    }
+
     // for now only the first note group will have a vector store
-    return Promise.all([this.settings.noteGroups[0]].map(noteGroup => {
-      const filesForNoteGroup = filesInGroupFolder(this.app, noteGroup);
-      return generateAndStoreEmbeddings({
-        files: filesForNoteGroup,
-        app: this.app,
-        vectorStore: this.vectorStore,
-        llmClient: this.llmClient,
-      });
-    }));
+    this.indexingStatus = INDEXING_STATUS;
+    await this.saveSettings(); // Save immediately to update UI
+
+    try {
+      await Promise.all([this.settings.noteGroups[0]].map(async noteGroup => {
+        const filesForNoteGroup = filesInGroupFolder(this.app, noteGroup);
+        const concurrencyManager = await generateAndStoreEmbeddings({
+          files: filesForNoteGroup,
+          app: this.app,
+          vectorStore: this.vectorStore,
+          llmClient: this.llmClient,
+          notify: (numCompleted: number) => {
+            console.info(`Indexed ${numCompleted} files`);
+            this.lastIndexedCount = numCompleted;
+            // this.saveSettings();
+          }
+        });
+        await concurrencyManager.done();
+      }));
+    } catch (error) {
+      console.error('Error during indexing:', error);
+    } finally {
+      this.indexingStatus = IDLE_STATUS;
+      await this.saveSettings();
+    }
   }
 }
 
@@ -268,18 +314,71 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
                 dropdown.setValue(this.plugin.settings.embeddingsModelVersion || '');
                 return;
               }
-              if (value !== '') {
+              if (value !== '' && value !== this.plugin.settings.embeddingsModelVersion) {
                 this.plugin.settings.embeddingsModelVersion = value;
                 this.plugin.clearVectorArray();
                 await this.plugin.saveSettings();
                 await this.plugin.indexVectorStores();
-                await this.plugin.saveSettings();
               }
             }
           );
           confirmModal.open();
         });
       });
+
+    new Setting(containerEl)
+      .setName('Enable Embeddings')
+      .setDesc('Toggle embeddings functionality on/off')
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.plugin.settings.embeddingsEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.embeddingsEnabled = value;
+            await this.plugin.saveSettings();
+            // Refresh the settings display to update status
+            this.display();
+          });
+      });
+
+    const statusEl = containerEl.createEl('div', { cls: 'embedding-status' });
+
+    if (this.plugin.settings.embeddingsEnabled) {
+      const status = this.plugin.indexingStatus === INDEXING_STATUS
+        ? '🔄 Indexing...'
+        : '✓ Ready';
+
+      statusEl.createEl('div', {
+        text: `Status: ${status}`,
+        cls: this.plugin.indexingStatus === INDEXING_STATUS ? 'status-indexing' : 'status-ready'
+      });
+
+      statusEl.createEl('div', {
+        text: `Indexed notes: ${this.plugin.lastIndexedCount}`,
+        cls: 'indexed-count'
+      });
+
+      const buttonContainer = statusEl.createEl('div', { cls: 'button-container' });
+      buttonContainer.style.marginTop = '0.5em';
+
+      const indexButton = buttonContainer.createEl('button', {
+        text: 'Index Notes',
+        cls: 'mod-cta',
+      });
+      indexButton.onclick = async () => {
+        await this.plugin.indexVectorStores();
+      };
+    } else {
+      statusEl.createEl('div', {
+        text: 'Embeddings are disabled',
+        cls: 'status-disabled'
+      });
+    }
+
+    // Add some basic styles
+    statusEl.style.marginTop = '1em';
+    statusEl.style.padding = '1em';
+    statusEl.style.backgroundColor = 'var(--background-secondary)';
+    statusEl.style.borderRadius = '4px';
 
     this.plugin.settings.noteGroups.forEach((noteGroup, i) => {
       // Create container div for this note group

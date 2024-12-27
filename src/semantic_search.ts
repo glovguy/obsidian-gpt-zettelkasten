@@ -7,25 +7,30 @@ export const generateAndStoreEmbeddings = async ({
   files,
   app,
   vectorStore,
-  llmClient
+  llmClient,
+  notify,
+  maxConcurrency = 4,
 }: {
   files: Array<TFile>,
   app: App,
   vectorStore: VectorStore,
-  llmClient: OpenAIClient
-}): Promise<any> => {
-  console.log(`Generating embeddings for ${files.length} files...`);
-  const maxConcurrency = 2;
-  console.log(`Gating requests to maximum ${maxConcurrency} at a time`);
-  const concurrencyManager = new ConcurrencyManager(maxConcurrency);
-  files.forEach(async (file: TFile) => {
+  llmClient: OpenAIClient,
+  notify: (numCompleted: number) => void,
+  maxConcurrency?: number,
+}): Promise<ConcurrencyManager<TFile>> => {
+  console.info(`Generating embeddings for ${files.length} files...`);
+  console.info(`Gating requests to maximum ${maxConcurrency} at a time`);
+
+  const fileIndexRequest = async (file: TFile) => {
     const linktext = app.metadataCache.fileToLinktext(file, file.path)
     const path = file.path;
     const filteredLines = await app.vault.cachedRead(file);
+
     if (filteredLines.length === 0) {
       console.error("Error extracting text for [[" + linktext + "]]");
       return;
     }
+
     const sha = shaForString(filteredLines);
     if (vectorStore.vectorExists(sha) && !vectorStore.getVector(linktext)) {
       console.info("Vector already exists for [[" + linktext + "]], but was renamed. Fixing...");
@@ -33,16 +38,18 @@ export const generateAndStoreEmbeddings = async ({
       vectorStore.renameVector({ sha, newLinktext: linktext });
       return;
     }
+
     if (vectorStore.vectorExists(sha) && vectorStore.getVector(linktext)) {
-      // Vector already exists
+      // Vector already exists for note, and there are no changes so we don't need to do anything
       return;
     }
-    await concurrencyManager.add(async () => {
-      const embedding = await llmClient.generateOpenAiEmbeddings([filteredLines]);
-      vectorStore.saveVector({ linktext, embedding, sha, path });
-    });
-  });
-  return concurrencyManager.done;
+
+    console.info(`Generating embeddings for [${linktext}]...`);
+    const embedding = await llmClient.generateOpenAiEmbeddings([filteredLines]);
+    vectorStore.saveVector({ linktext, embedding, sha, path });
+  };
+
+  return new ConcurrencyManager(maxConcurrency, files, fileIndexRequest, notify);
 };
 
 export const allTags = function(text: string) {
@@ -62,56 +69,60 @@ export class FileFilter {
 }
 
 class ConcurrencyManager<T> {
-  private concurrentRequests: number = 0;
-  private queue: (() => Promise<T>)[] = [];
+  private activeRequests: number = 0;
+  private maxConcurrentRequests: number;
+  private queue: (() => Promise<void>)[] = [];
   private resolveDone: (() => void) | null = null;
   public allDone: Promise<void>;
+  public numRequestsCompleted: number = 0;
+  public notify: (numCompleted: number) => void;
 
-  constructor(private maxConcurrentRequests: number) {
+  constructor(maxConcurrentRequests: number, collection: Array<T>, request: (item: T) => Promise<void>, notify?: (numCompleted: number) => void) {
     this.maxConcurrentRequests = maxConcurrentRequests;
+    this.notify = notify ?? (() => {});  // Default no-op function
     this.allDone = new Promise<void>((resolve) => {
       this.resolveDone = resolve;
     });
+    this.forEachConcurrently(collection, request);
   }
 
-  async add(request: () => Promise<T>): Promise<void> {
-    if (this.concurrentRequests >= this.maxConcurrentRequests) {
-      this.queue.push(async () => await request());
-      return;
+  forEachConcurrently(collection: Array<T>, request: (item: T) => Promise<void>): void {
+    for (const item of collection) {
+      this.add(() => request(item));
     }
-    this.concurrentRequests += 1;
-    try {
-      await request();
-    } finally {
-      this.concurrentRequests -= 1;
-      this.checkDone();
-      this.next();
-    }
+  }
+
+  async add(request: () => Promise<void>): Promise<void> {
+    this.queue.push(request);
+    this.next();
   }
 
   private next(): void {
-    if (this.queue.length <= 0 || this.concurrentRequests >= this.maxConcurrentRequests) {
+    if (this.queue.length <= 0 || this.activeRequests >= this.maxConcurrentRequests) {
       return;
     }
     const nextRequest = this.queue.shift();
     if (nextRequest) {
-      this.concurrentRequests += 1;
-      nextRequest().finally(() => {
-        this.concurrentRequests -= 1;
-        this.checkDone();
-        this.next();
-      });
+      this.activeRequests += 1;
+      nextRequest()
+        .catch(error => {
+          console.error('Request failed:', error);
+        })
+        .finally(() => {
+          this.activeRequests -= 1;
+          this.numRequestsCompleted += 1;
+          this.notify(this.numRequestsCompleted);
+          if (this.activeRequests === 0 && this.queue.length === 0 && this.resolveDone) {
+            this.resolveDone();
+            this.resolveDone = null;
+            return;
+          }
+          this.next();
+        });
     }
   }
 
-  private checkDone() {
-    if (this.concurrentRequests === 0 && this.queue.length === 0 && this.resolveDone) {
-      this.resolveDone();
-      this.resolveDone = null; // Reset resolveDone to prevent multiple calls
-    }
-  }
-
-  get done(): Promise<void> {
-    return this.allDone;
+  async done(): Promise<void> {
+    await this.allDone;
   }
 }
