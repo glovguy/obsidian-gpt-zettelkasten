@@ -8,6 +8,9 @@ import {
   TFile,
   TFolder,
   WorkspaceLeaf,
+  Events,
+  EventRef,
+  Notice,
 } from 'obsidian';
 import {
   OpenAIClient,
@@ -27,6 +30,7 @@ import EmbeddingsOverwriteConfirmModal from 'src/embeddings_overwrite_confirm_mo
 
 const IDLE_STATUS = 'idle';
 const INDEXING_STATUS = 'indexing';
+
 interface ZettelkastenLLMToolsPluginSettings {
   openaiAPIKey: string;
   anthropicAPIKey: string;
@@ -49,6 +53,9 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
 };
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
+  app: App & {
+    workspace: WorkspaceWithCustomEvents;
+  };
   settings: ZettelkastenLLMToolsPluginSettings;
   vectorStore: VectorStore;
   fileFilter: FileFilter;
@@ -58,8 +65,10 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   anthropicClient: AnthropicClient;
   indexingStatus: typeof IDLE_STATUS | typeof INDEXING_STATUS;
   lastIndexedCount: number;
+  private events: Events;
 
   async onload() {
+    this.events = new Events();
     this.fileFilter = new FileFilter();
     await this.loadSettings();
     this.vectorStore = new VectorStore(this);
@@ -225,7 +234,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     // for now only the first note group will have a vector store
     this.indexingStatus = INDEXING_STATUS;
     this.lastIndexedCount = 0;
-    this.app.workspace.trigger('zettelkasten-llm-tools:index-updated');
+    this.trigger('zettelkasten-llm-tools:index-updated');
     await this.saveSettings(); // Save immediately to update UI
 
     try {
@@ -238,7 +247,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
         llmClient: this.llmClient,
         notify: (numCompleted: number) => {
           this.lastIndexedCount = numCompleted;
-          this.app.workspace.trigger('zettelkasten-llm-tools:index-updated');
+          this.trigger('zettelkasten-llm-tools:index-updated');
         }
       });
       await concurrencyManager.done();
@@ -246,10 +255,24 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
       console.error('Error during indexing:', error);
     } finally {
       this.indexingStatus = IDLE_STATUS;
-      this.app.workspace.trigger('zettelkasten-llm-tools:index-updated');
+      this.trigger('zettelkasten-llm-tools:index-updated');
       await this.saveSettings();
+      new Notice(`Indexed ${this.lastIndexedCount} notes`);
     }
   }
+
+  on(name: 'zettelkasten-llm-tools:index-updated', callback: () => void): EventRef {
+    return this.events.on(name, callback);
+  }
+
+  trigger(name: 'zettelkasten-llm-tools:index-updated'): void {
+    this.events.trigger(name);
+  }
+}
+
+interface WorkspaceWithCustomEvents extends Events {
+  on(name: 'zettelkasten-llm-tools:index-updated', callback: () => void): EventRef;
+  trigger(name: 'zettelkasten-llm-tools:index-updated'): void;
 }
 
 class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
@@ -392,7 +415,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
         cls: 'indexed-count'
       });
 
-      this.app.workspace.on('zettelkasten-llm-tools:index-updated', () => {
+      this.plugin.on('zettelkasten-llm-tools:index-updated', () => {
         indexedCountEl.setText(`Indexed notes: ${this.plugin.lastIndexedCount}`);
         const newStatus = this.plugin.indexingStatus === INDEXING_STATUS
           ? '🔄 Indexing...'
@@ -411,7 +434,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
       });
       indexButton.onclick = async () => {
         await this.plugin.indexVectorStores();
-        this.app.workspace.trigger('zettelkasten-llm-tools:index-updated');
+        this.plugin.trigger('zettelkasten-llm-tools:index-updated');
       };
     } else {
       statusEl.createEl('div', {
