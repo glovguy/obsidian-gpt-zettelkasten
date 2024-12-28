@@ -19,7 +19,6 @@ export const generateAndStoreEmbeddings = async ({
   maxConcurrency?: number,
 }): Promise<ConcurrencyManager<TFile>> => {
   console.info(`Generating embeddings for ${files.length} files...`);
-  console.info(`Gating requests to maximum ${maxConcurrency} at a time`);
 
   const fileIndexRequest = async (file: TFile) => {
     const linktext = app.metadataCache.fileToLinktext(file, file.path)

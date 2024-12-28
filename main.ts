@@ -23,6 +23,7 @@ import BatchVectorStorageModal from './src/batch_vector_storage_modal';
 import { VIEW_TYPE_AI_COPILOT, VIEW_TYPE_AI_SEARCH } from './src/constants';
 import SemanticSearchTab from 'src/semantic_search_tab';
 import { DEFAULT_NOTE_GROUPS, NoteGroup, filesInGroupFolder } from 'src/note_group';
+import EmbeddingsOverwriteConfirmModal from 'src/embeddings_overwrite_confirm_modal';
 
 const IDLE_STATUS = 'idle';
 const INDEXING_STATUS = 'indexing';
@@ -33,7 +34,10 @@ interface ZettelkastenLLMToolsPluginSettings {
   noteGroups: Array<NoteGroup>;
   embeddingsModelVersion?: string;
   embeddingsEnabled: boolean;
+  indexedNoteGroup: number;
 };
+
+// TODO: when removing a note group, remove the vectors associated with it
 
 const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   openaiAPIKey: '',
@@ -41,6 +45,7 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   vectors: [],
   noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
   embeddingsEnabled: false,
+  indexedNoteGroup: 0,
 };
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
@@ -224,20 +229,19 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     await this.saveSettings(); // Save immediately to update UI
 
     try {
-      await Promise.all([this.settings.noteGroups[0]].map(async noteGroup => {
-        const filesForNoteGroup = filesInGroupFolder(this.app, noteGroup);
-        const concurrencyManager = await generateAndStoreEmbeddings({
-          files: filesForNoteGroup,
-          app: this.app,
-          vectorStore: this.vectorStore,
-          llmClient: this.llmClient,
-          notify: (numCompleted: number) => {
-            this.lastIndexedCount = numCompleted;
-            this.app.workspace.trigger('zettelkasten-llm-tools:index-updated');
-          }
-        });
-        await concurrencyManager.done();
-      }));
+      const noteGroup = this.settings.noteGroups[this.settings.indexedNoteGroup];
+      const filesForNoteGroup = filesInGroupFolder(this.app, noteGroup);
+      const concurrencyManager = await generateAndStoreEmbeddings({
+        files: filesForNoteGroup,
+        app: this.app,
+        vectorStore: this.vectorStore,
+        llmClient: this.llmClient,
+        notify: (numCompleted: number) => {
+          this.lastIndexedCount = numCompleted;
+          this.app.workspace.trigger('zettelkasten-llm-tools:index-updated');
+        }
+      });
+      await concurrencyManager.done();
     } catch (error) {
       console.error('Error during indexing:', error);
     } finally {
@@ -322,7 +326,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
 
         dropdown.setValue(this.plugin.settings.embeddingsModelVersion || '');
         dropdown.onChange(async (value) => {
-          const confirmModal = new EmbeddingsModelOverwriteConfirmModal(
+          const confirmModal = new EmbeddingsOverwriteConfirmModal(
             this.app,
             this.plugin,
             async (confirmWasClicked) => {
@@ -332,6 +336,37 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
               }
               if (value !== '' && value !== this.plugin.settings.embeddingsModelVersion) {
                 this.plugin.settings.embeddingsModelVersion = value;
+                this.plugin.clearVectorArray();
+                await this.plugin.saveSettings();
+                await this.plugin.indexVectorStores();
+              }
+            }
+          );
+          confirmModal.open();
+        });
+      });
+
+    new Setting(statusEl)
+      .setName('Note group to index')
+      .setDesc('Select which note group to index with embeddings. (Only one note group can be indexed.)')
+      .addDropdown(dropdown => {
+        this.plugin.settings.noteGroups.forEach((group, index) => {
+          dropdown.addOption(index.toString(), group.name);
+        });
+
+        dropdown.setValue(this.plugin.settings.indexedNoteGroup.toString());
+        dropdown.onChange(async (value) => {
+          const confirmModal = new EmbeddingsOverwriteConfirmModal(
+            this.app,
+            this.plugin,
+            async (confirmWasClicked) => {
+              if (!confirmWasClicked) {
+                dropdown.setValue(this.plugin.settings.indexedNoteGroup.toString());
+                return;
+              }
+              const newIndex = parseInt(value);
+              if (newIndex !== this.plugin.settings.indexedNoteGroup) {
+                this.plugin.settings.indexedNoteGroup = newIndex;
                 this.plugin.clearVectorArray();
                 await this.plugin.saveSettings();
                 await this.plugin.indexVectorStores();
@@ -485,10 +520,6 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
             });
         });
 
-      new Setting(groupContainer)
-        .setName(`${(i == 0) ? '' : 'Not'} Indexed`)
-        .setDesc('This note group ' + (i == 0 ? 'is' : 'is NOT') + ' indexed by the vector store. (Only the first note group is indexed.)');
-
       if (i !== 0 && this.plugin.settings.noteGroups.length > 1) {
         new Setting(groupContainer)
           .setName('Delete Note Group')
@@ -540,54 +571,5 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
             this.display(); // Refresh the settings display to show the new group
           });
       });
-  }
-}
-
-class EmbeddingsModelOverwriteConfirmModal extends Modal {
-  plugin: ZettelkastenLLMToolsPlugin;
-  confirmClicked: boolean;
-  confirmCallback: (confirmClicked: boolean) => void;
-
-  constructor(app: App, plugin: ZettelkastenLLMToolsPlugin, confirmCallback: (confirmClicked: boolean) => void) {
-    super(app);
-    this.plugin = plugin;
-    this.confirmCallback = confirmCallback;
-    this.confirmClicked = false;
-  }
-
-  async onOpen() {
-    const { contentEl } = this;
-
-    contentEl.createEl("h3", { text: "Change Embeddings Model" });
-    contentEl.createEl("p", {
-      text: "Changing the embedding model used means throwing out existing vectors and re-indexing using the new model. Please confirm that you would like to trigger this re-indexing."
-    });
-    contentEl.createEl("p", {
-      text: `This will delete ${this.plugin.settings.vectors.length} vectors.`
-    });
-
-    const buttonContainer = contentEl.createDiv();
-    buttonContainer.style.display = "flex";
-    buttonContainer.style.justifyContent = "flex-end";
-    buttonContainer.style.gap = "10px";
-    buttonContainer.style.marginTop = "20px";
-
-    const confirmButton = buttonContainer.createEl("button", {
-      text: "Confirm",
-      cls: "mod-warning"
-    });
-    confirmButton.addEventListener("click", () => {
-      this.confirmClicked = true;
-      this.close();
-    });
-
-    const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
-    cancelButton.addEventListener("click", () => this.close());
-  }
-
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-    this.confirmCallback(this.confirmClicked);
   }
 }

@@ -1,8 +1,9 @@
 import { createRoot } from 'react-dom/client';
-import { Modal, App, Notice, TFile } from 'obsidian';
+import { Modal, App, Notice } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from '../main';
 import { useState, useEffect } from 'react';
 import { NoteGroup, filesInGroupFolder } from './note_group';
+import EmbeddingsOverwriteConfirmModal from './embeddings_overwrite_confirm_modal';
 
 
 export default class BatchVectorStorageModal extends Modal {
@@ -40,13 +41,9 @@ const BatchSetup = ({
   modal: BatchVectorStorageModal,
   noteGroups: Array<NoteGroup>,
 }) => {
-  const filteredFiles = filesInGroupFolder(plugin.app, noteGroups[0]);
   const [numFilesNeedingIndexing, setNumFilesNeedingIndexing] = useState<number | undefined>();
-  const [selectedNoteGroupIndex, setSelectedNoteGroupIndex] = useState(0);
-
-  const onSelectedGroupChange = async (newGroupIndex: number) => {
-    setSelectedNoteGroupIndex(newGroupIndex);
-  };
+  const [selectedNoteGroupIndex, setSelectedNoteGroupIndex] = useState(plugin.settings.indexedNoteGroup);
+  const filteredFiles = filesInGroupFolder(plugin.app, noteGroups[selectedNoteGroupIndex]);
 
   useEffect(() => {
     const countFilesNeedingIndexing = async () => {
@@ -57,7 +54,28 @@ const BatchSetup = ({
     };
 
     countFilesNeedingIndexing();
-  }, [selectedNoteGroupIndex]); // Re-run when these dependencies change
+  }, [selectedNoteGroupIndex]);
+
+  const onStartBatchEmbeddingClicked = () => {
+    if (selectedNoteGroupIndex !== plugin.settings.indexedNoteGroup) {
+      const confirmModal = new EmbeddingsOverwriteConfirmModal(
+        plugin.app,
+        plugin,
+        async (confirmWasClicked) => {
+          if (!confirmWasClicked) {
+            return;
+          }
+          plugin.settings.indexedNoteGroup = selectedNoteGroupIndex;
+          plugin.clearVectorArray();
+          await plugin.saveSettings();
+          enqueueEmbeddings();
+        }
+      );
+      confirmModal.open();
+    } else {
+      enqueueEmbeddings();
+    }
+  };
 
   const enqueueEmbeddings = () => {
     plugin.indexVectorStores();
@@ -68,8 +86,18 @@ const BatchSetup = ({
   return (
     <div>
       <h1>Set up batch embedding</h1>
-      <span>Note Group: {noteGroups[0].name}</span><p />
-      <button onClick={enqueueEmbeddings}>Start batch embedding</button>
+      <select
+        value={selectedNoteGroupIndex}
+        onChange={async (e) => {
+          const newIndex = Number(e.target.value);
+          setSelectedNoteGroupIndex(newIndex);
+        }}
+      >
+        {noteGroups.map((group, index) => (
+          <option key={index} value={index}>{group.name}</option>
+        ))}
+      </select><p />
+      <button onClick={onStartBatchEmbeddingClicked}>Start batch embedding</button>
       <div>
         <h3>Preview</h3>
         <span>{filteredFiles.length} files match pattern</span><p></p>
