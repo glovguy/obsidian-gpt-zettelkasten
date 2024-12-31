@@ -76,7 +76,7 @@ export class VectorStore {
 
   async upsertVector(file: TFile): Promise<StoredVector> {
     const { linktext } = this.plugin.linkTextForFile(file);
-    const { llmClient } = this.plugin;
+    const { openaiClient } = this.plugin;
     const filteredLines = await this.plugin.app.vault.cachedRead(file);
     if (filteredLines.length === 0) {
       throw new Error("Error extracting text for [[" + linktext + "]]");
@@ -93,7 +93,7 @@ export class VectorStore {
       console.info(`Vector already exists for [[${linktext}]], but was renamed. Fixing...`);
       this.renameVector({ sha, newLinktext: linktext });
     }
-    const embedding = await llmClient.generateOpenAiEmbeddings([filteredLines]);
+    const embedding = await openaiClient.generateOpenAiEmbeddings([filteredLines]);
     const vector = { linktext, embedding, sha, path: file.path };
     this.saveVector(vector);
 

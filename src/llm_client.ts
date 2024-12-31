@@ -1,8 +1,12 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { MessageParam } from '@anthropic-ai/sdk/resources';
+import type { ChatCompletionMessageParam } from 'openai/resources';
 
-interface OpenAIClientConfig {
+type OpenAIChatMessage = ChatCompletionMessageParam;
+type AnthropicChatMessage = MessageParam;
+
+export interface OpenAIClientConfig {
   embeddings_model: EmbeddingModelNames;
   quantization_decimals: number;
 }
@@ -23,7 +27,7 @@ interface EmbeddingModel {
   available: boolean;
 }
 
-export function availableEmbeddingModels(openAIKey: string, anthropicKey: string): EmbeddingModel[] {
+export function availableEmbeddingModels(openAIKey: string): EmbeddingModel[] {
   return [
     {
       provider: OPENAI_PROVIDER,
@@ -38,24 +42,22 @@ export function availableEmbeddingModels(openAIKey: string, anthropicKey: string
       available: !!openAIKey,
     },
   ];
-}
+};
 
 export const unlabelledEmbeddingModel = OPENAI_EMBEDDING_3_SMALL;
 export const quantizationDecimals = 3;
 
-const defaultOpenAIConfig = (): OpenAIClientConfig => ({
+const defaultOpenAIConfig: OpenAIClientConfig = {
   embeddings_model: OPENAI_EMBEDDING_3_SMALL,
   quantization_decimals: quantizationDecimals,
-});
-
-const modelNameLookup: { [name: string]: string } = {
-  "sonnet": "claude-3-5-sonnet-20241022",
-  "haiku": "claude-3-haiku-20240307",
 };
+
+export const CLAUDE_3_5_SONNET = 'claude-3-5-sonnet-latest';
+export const CLAUDE_3_5_HAIKU = 'claude-3-5-haiku-latest';
 
 export class AnthropicClient {
   anthropic: Anthropic;
-  defaultModel = "sonnet"
+  defaultModel = CLAUDE_3_5_SONNET;
 
   constructor(apiKey: string) {
     this.anthropic = new Anthropic({
@@ -64,16 +66,24 @@ export class AnthropicClient {
     });
   }
 
-  async createMessage(system_prompt: string, msgs: MessageParam[], modelName?: string) {
-    const model = modelNameLookup[modelName || this.defaultModel];
+  async createMessage(system_prompt: string, msgs: ChatMessage[], modelName?: string) {
+    const model = modelName || this.defaultModel;
     const msg = await this.anthropic.messages.create({
       model: model,
       max_tokens: 1024,
-      messages: msgs,
+      messages: msgs.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      } as AnthropicChatMessage)),
       system: system_prompt,
     });
     return msg;
   }
+}
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
 export class OpenAIClient {
@@ -81,11 +91,32 @@ export class OpenAIClient {
   config: OpenAIClientConfig;
 
   constructor(apiKey: string, config?: OpenAIClientConfig) {
-    this.config = config || defaultOpenAIConfig();
+    this.config = { ...defaultOpenAIConfig, ...config };
     this.openai = new OpenAI({
       apiKey: apiKey,
       dangerouslyAllowBrowser: true, // for obsidian, all API keys are provided by the user
     });
+  }
+
+  async createMessage(system_prompt: string, msgs: ChatMessage[], modelName?: string) {
+    const model = modelName || OPENAI_GPT4o_MINI;
+
+    // Convert messages to OpenAI format
+    const formattedMessages: OpenAIChatMessage[] = [
+      { role: 'system', content: system_prompt },
+      ...msgs.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      } as OpenAIChatMessage))
+    ];
+
+    const response = await this.openai.chat.completions.create({
+      model: model,
+      messages: formattedMessages,
+      max_tokens: 1024,
+    });
+
+    return response.choices[0].message.content || '';
   }
 
   async generateOpenAiEmbeddings(docs: Array<string>) {
@@ -124,4 +155,56 @@ export async function generateEmbeddings(
     default:
       throw new Error(`Unknown embedding model: ${modelName}`);
   }
+}
+
+export const OPENAI_GPT4o = 'gpt-4o';
+export const OPENAI_GPT4o_MINI = 'gpt-4o-mini';
+export const OPENAI_GPT35 = 'gpt-3.5-turbo';
+export type ChatModelNames =
+  | typeof OPENAI_GPT4o
+  | typeof OPENAI_GPT4o_MINI
+  | typeof OPENAI_GPT35
+  | typeof CLAUDE_3_5_SONNET
+  | typeof CLAUDE_3_5_HAIKU;
+
+export interface ChatModel {
+  provider: typeof OPENAI_PROVIDER | typeof ANTHROPIC_PROVIDER;
+  name: ChatModelNames;
+  displayName: string;
+  available: boolean;
+}
+
+export function availableChatModels(openAIKey: string, anthropicKey: string): ChatModel[] {
+  return [
+    {
+      provider: OPENAI_PROVIDER,
+      name: OPENAI_GPT4o,
+      displayName: 'GPT-4o',
+      available: !!openAIKey,
+    },
+    {
+      provider: OPENAI_PROVIDER,
+      name: OPENAI_GPT4o_MINI,
+      displayName: 'GPT-4o Mini',
+      available: !!openAIKey,
+    },
+    {
+      provider: OPENAI_PROVIDER,
+      name: OPENAI_GPT35,
+      displayName: 'GPT-3.5 Turbo',
+      available: !!openAIKey,
+    },
+    {
+      provider: ANTHROPIC_PROVIDER,
+      name: CLAUDE_3_5_SONNET,
+      displayName: 'Claude 3.5 Sonnet',
+      available: !!anthropicKey,
+    },
+    {
+      provider: ANTHROPIC_PROVIDER,
+      name: CLAUDE_3_5_HAIKU,
+      displayName: 'Claude 3.5 Haiku',
+      available: !!anthropicKey,
+    },
+  ];
 }

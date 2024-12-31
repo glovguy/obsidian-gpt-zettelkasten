@@ -7,14 +7,14 @@ export const generateAndStoreEmbeddings = async ({
   files,
   app,
   vectorStore,
-  llmClient,
+  openaiClient,
   notify,
   maxConcurrency = 4,
 }: {
   files: Array<TFile>,
   app: App,
   vectorStore: VectorStore,
-  llmClient: OpenAIClient,
+  openaiClient: OpenAIClient,
   notify: (numCompleted: number) => void,
   maxConcurrency?: number,
 }): Promise<ConcurrencyManager<TFile>> => {
@@ -44,7 +44,7 @@ export const generateAndStoreEmbeddings = async ({
     }
 
     console.info(`Generating embeddings for [${linktext}]...`);
-    const embedding = await llmClient.generateOpenAiEmbeddings([filteredLines]);
+    const embedding = await openaiClient.generateOpenAiEmbeddings([filteredLines]);
     vectorStore.saveVector({ linktext, embedding, sha, path });
   };
 

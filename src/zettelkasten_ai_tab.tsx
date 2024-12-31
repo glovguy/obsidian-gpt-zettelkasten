@@ -8,6 +8,7 @@ import { NoteGroup } from './note_group';
 import { VIEW_TYPE_AI_COPILOT } from './constants';
 import { App } from 'obsidian';
 import { useState, useEffect } from 'react';
+import { availableChatModels, ChatMessage, ChatModel } from './llm_client';
 
 
 const DEFAULT_SYSTEM_PROMPT = 'The following is a Zettelkasten note written by the user. The note should have 1. a clear title, 2. a single, clear thought stated briefly, 3. links to relevant ideas.\nSuggest revisions for this note. Be very brief and concise. Imitate their writing style. If you show an example of the suggested edits, wrap them in a <note></note> tag. If you want to suggest splitting into multiple notes, use more than one <note></note> tag.';
@@ -71,6 +72,7 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
     if (!group.notesFolder || !initialActiveFile) { return false; }
     return initialActiveFile.path.startsWith(group.notesFolder);
   }));
+  const [availableModels, setAvailableModels] = useState<ChatModel[]>([]);
 
   useEffect(() => {
     const onFileChange = () => {
@@ -92,6 +94,17 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
     };
   }, [activeFile, app.workspace]);
 
+  useEffect(() => {
+    setAvailableModels(availableChatModels(
+      plugin.settings.openaiAPIKey,
+      plugin.settings.anthropicAPIKey
+    ));
+  }, [plugin.settings.openaiAPIKey, plugin.settings.anthropicAPIKey]);
+
+  const isModelAvailable = availableModels.some(model =>
+    model.name === plugin.settings.copilotModel && model.available
+  );
+
   const populateCopilotSuggest = async () => {
     if (!activeFile) {
       setResponse('Error loading current file...');
@@ -107,26 +120,45 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
       const tags = tagCounts ? Object.keys(tagCounts) : null;
       const tagsMessage = tags ? `\ntags used in vault: ${tags.join(" ")}` : "";
       const system_prompt = matchingNoteGroup?.copilotPrompt ?? localSystemPrompt;
+      const userMessage: ChatMessage = {
+        role: 'user',
+        content: `<note>\n# ${activeFileTitle}\n${activeFileText}</note>${tagsMessage}`
+      };
 
-      const msg = await plugin.anthropicClient.createMessage(
-        system_prompt,
-        [
-          { role: 'user', content: `<note>\n# ${activeFileTitle}\n${activeFileText}</note>${tagsMessage}` }
-        ],
-        'haiku'
-      );
-      setResponse(msg.content[0].type === 'text' ? msg.content[0].text : JSON.stringify(msg.content[0]));
-      setIsLoadingResponse(false);
+      const selectedModel = plugin.settings.copilotModel;
+      let response;
+
+      if (selectedModel.startsWith('gpt')) {
+        response = await plugin.openaiClient.createMessage(
+          system_prompt,
+          [userMessage],
+          selectedModel
+        );
+        setResponse(response);
+      } else {
+        const msg = await plugin.anthropicClient.createMessage(
+          system_prompt,
+          [userMessage],
+          selectedModel
+        );
+        setResponse(msg.content[0].type === 'text' ? msg.content[0].text : JSON.stringify(msg.content[0]));
+      }
     } catch (error) {
-      console.error('Error calling Anthropic API:', error);
+      console.error('Error calling LLM API:', error);
       setResponse('An error occurred while processing your request.');
+    } finally {
       setIsLoadingResponse(false);
     }
   };
 
   return (
-    <div>
+    <div className={!isModelAvailable ? 'is-disabled' : ''}>
       <h1>Copilot Note Suggestions</h1>
+      {!isModelAvailable && (
+        <div className="notice">
+          <p>⚠️ Copilot is disabled. Please configure an API key for the selected model in settings.</p>
+        </div>
+      )}
       {matchingNoteGroup !== undefined ? (
         <p><span role="img" aria-label="folder">📁</span> {matchingNoteGroup.name}</p>
       ) : (

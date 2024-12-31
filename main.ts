@@ -17,6 +17,8 @@ import {
   unlabelledEmbeddingModel,
   availableEmbeddingModels,
   AnthropicClient,
+  availableChatModels,
+  CLAUDE_3_5_HAIKU,
 } from './src/llm_client';
 import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
@@ -39,6 +41,7 @@ interface ZettelkastenLLMToolsPluginSettings {
   embeddingsModelVersion?: string;
   embeddingsEnabled: boolean;
   indexedNoteGroup: number;
+  copilotModel: string;
 };
 
 // TODO: when removing a note group, remove the vectors associated with it
@@ -50,6 +53,7 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
   embeddingsEnabled: false,
   indexedNoteGroup: 0,
+  copilotModel: CLAUDE_3_5_HAIKU,
 };
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
@@ -61,7 +65,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   fileFilter: FileFilter;
   copilotTab: CopilotTab;
   semanticSearchTab: SemanticSearchTab;
-  llmClient: OpenAIClient;
+  openaiClient: OpenAIClient;
   anthropicClient: AnthropicClient;
   indexingStatus: typeof IDLE_STATUS | typeof INDEXING_STATUS;
   lastIndexedCount: number;
@@ -93,7 +97,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
               vectorStore: this.vectorStore,
               files: [activeFile],
               app: this.app,
-              llmClient: this.llmClient,
+              openaiClient: this.openaiClient,
               notify: (numCompleted: number) => {
                 this.lastIndexedCount = numCompleted;
               }
@@ -201,7 +205,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
 
     // this.indexVectorStores();
 
-    this.llmClient = new OpenAIClient(this.settings.openaiAPIKey);
+    this.openaiClient = new OpenAIClient(this.settings.openaiAPIKey);
     this.anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
   }
 
@@ -214,7 +218,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   async saveSettings() {
     console.log('saving...');
     await this.saveData(this.settings);
-    this.llmClient = new OpenAIClient(this.settings.openaiAPIKey);
+    this.openaiClient = new OpenAIClient(this.settings.openaiAPIKey);
     this.anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
     console.log('done');
   }
@@ -244,7 +248,7 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
         files: filesForNoteGroup,
         app: this.app,
         vectorStore: this.vectorStore,
-        llmClient: this.llmClient,
+        openaiClient: this.openaiClient,
         notify: (numCompleted: number) => {
           this.lastIndexedCount = numCompleted;
           this.trigger('zettelkasten-llm-tools:index-updated');
@@ -338,7 +342,6 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
       .addDropdown(dropdown => {
         const availableModels = availableEmbeddingModels(
           this.plugin.settings.openaiAPIKey,
-          this.plugin.settings.anthropicAPIKey
         );
 
         availableModels.forEach(model => {
@@ -449,6 +452,28 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
     statusEl.style.padding = '1em';
     statusEl.style.backgroundColor = 'var(--background-secondary)';
     statusEl.style.borderRadius = '4px';
+
+    new Setting(containerEl)
+      .setName('Copilot Model')
+      .setDesc('Select which model to use for the AI Copilot')
+      .addDropdown(dropdown => {
+        const availableModels = availableChatModels(
+          this.plugin.settings.openaiAPIKey,
+          this.plugin.settings.anthropicAPIKey
+        );
+
+        availableModels.forEach(model => {
+          if (model.available) {
+            dropdown.addOption(model.name, model.displayName);
+          }
+        });
+
+        dropdown.setValue(this.plugin.settings.copilotModel)
+          .onChange(async (value) => {
+            this.plugin.settings.copilotModel = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     this.plugin.settings.noteGroups.forEach((noteGroup, i) => {
       // Create container div for this note group
