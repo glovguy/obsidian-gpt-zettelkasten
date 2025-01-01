@@ -151,14 +151,11 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
     }
   };
 
+  const responseWithoutNoteTag = response.replace(/<note>([\s\S]*?)<\/note>/, '');
+
   return (
     <div className={!isModelAvailable ? 'is-disabled' : ''}>
       <h1>Copilot Note Suggestions</h1>
-      {!isModelAvailable && (
-        <div className="notice">
-          <p>⚠️ Copilot is disabled. Please configure an API key for the selected model in settings.</p>
-        </div>
-      )}
       {matchingNoteGroup !== undefined ? (
         <p><span role="img" aria-label="folder">📁</span> {matchingNoteGroup.name}</p>
       ) : (
@@ -176,14 +173,18 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
           <br />
         </>
       )}
-      <br />
-      <button onClick={() => populateCopilotSuggest()}>Suggest Revisions</button><br />
-      <hr />
-      {isLoadingResponse && <span>Loading...</span>}<p></p>
-      {response.includes('<note>') ? (
-        <ReactMarkdown>{response.match(/<note>([\s\S]*?)<\/note>/)?.[1] || ''}</ReactMarkdown>
+      {!isModelAvailable ? (
+        <div className="notice">
+          <p>⚠️ Copilot is disabled. Please configure an API key for the selected model in settings.</p>
+        </div>
       ) : (
-        <ReactMarkdown>{response}</ReactMarkdown>
+        <>
+          <br />
+          <button onClick={() => populateCopilotSuggest()}>Suggest Revisions</button><br />
+          <hr />
+          {isLoadingResponse && <span>Loading...</span>}<p></p>
+          <ReactMarkdown>{responseWithoutNoteTag}</ReactMarkdown>
+        </>
       )}
     </div>
   );

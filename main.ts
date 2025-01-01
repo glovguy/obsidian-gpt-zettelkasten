@@ -11,6 +11,7 @@ import {
   Events,
   EventRef,
   Notice,
+  DropdownComponent,
 } from 'obsidian';
 import {
   OpenAIClient,
@@ -265,18 +266,18 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
     }
   }
 
-  on(name: 'zettelkasten-llm-tools:index-updated', callback: () => void): EventRef {
+  on(name: 'zettelkasten-llm-tools:index-updated' | 'zettelkasten-llm-tools:api-keys-updated', callback: () => void): EventRef {
     return this.events.on(name, callback);
   }
 
-  trigger(name: 'zettelkasten-llm-tools:index-updated'): void {
+  trigger(name: 'zettelkasten-llm-tools:index-updated' | 'zettelkasten-llm-tools:api-keys-updated'): void {
     this.events.trigger(name);
   }
 }
 
 interface WorkspaceWithCustomEvents extends Events {
-  on(name: 'zettelkasten-llm-tools:index-updated', callback: () => void): EventRef;
-  trigger(name: 'zettelkasten-llm-tools:index-updated'): void;
+  on(name: 'zettelkasten-llm-tools:index-updated' | 'zettelkasten-llm-tools:api-keys-updated', callback: () => void): EventRef;
+  trigger(name: 'zettelkasten-llm-tools:index-updated' | 'zettelkasten-llm-tools:api-keys-updated'): void;
 }
 
 class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
@@ -295,7 +296,6 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
     const {containerEl} = this;
 
     containerEl.empty();
-
     new Setting(containerEl)
       .setName('OpenAI API Key')
       .setDesc('Paste your OpenAI API key here.')
@@ -306,6 +306,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
         .onChange(async (value: string) => {
           this.plugin.settings.openaiAPIKey = value;
           await this.plugin.saveSettings();
+          this.plugin.trigger('zettelkasten-llm-tools:api-keys-updated');
         }));
 
     new Setting(containerEl)
@@ -318,6 +319,7 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
         .onChange(async (value: string) => {
           this.plugin.settings.anthropicAPIKey = value;
           await this.plugin.saveSettings();
+          this.plugin.trigger('zettelkasten-llm-tools:api-keys-updated');
         }));
 
     const statusEl = containerEl.createEl('div', { cls: 'embedding-status' });
@@ -453,10 +455,12 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
     statusEl.style.backgroundColor = 'var(--background-secondary)';
     statusEl.style.borderRadius = '4px';
 
+    let copilotModelSettingDropdown: DropdownComponent;
     new Setting(containerEl)
       .setName('Copilot Model')
       .setDesc('Select which model to use for the AI Copilot')
       .addDropdown(dropdown => {
+        copilotModelSettingDropdown = dropdown;
         const availableModels = availableChatModels(
           this.plugin.settings.openaiAPIKey,
           this.plugin.settings.anthropicAPIKey
@@ -474,6 +478,22 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    this.plugin.on('zettelkasten-llm-tools:api-keys-updated', () => {
+      const availableModels = availableChatModels(
+        this.plugin.settings.openaiAPIKey,
+        this.plugin.settings.anthropicAPIKey
+      );
+      while (copilotModelSettingDropdown.selectEl.options.length > 0) {
+        copilotModelSettingDropdown.selectEl.remove(0);
+      }
+      availableModels.forEach(model => {
+        if (model.available) {
+          copilotModelSettingDropdown.addOption(model.name, model.displayName);
+        }
+      });
+      copilotModelSettingDropdown.setValue(this.plugin.settings.copilotModel);
+    });
 
     this.plugin.settings.noteGroups.forEach((noteGroup, i) => {
       // Create container div for this note group
