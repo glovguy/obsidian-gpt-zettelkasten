@@ -9,7 +9,7 @@ type AnthropicChatMessage = MessageParam;
 export interface OpenAIClientConfig {
   embeddings_model: EmbeddingModelNames;
   quantization_decimals: number;
-}
+};
 
 export const OPENAI_PROVIDER = 'openai';
 export const ANTHROPIC_PROVIDER = 'anthropic';
@@ -25,7 +25,7 @@ interface EmbeddingModel {
   name: EmbeddingModelNames;
   displayName: string;
   available: boolean;
-}
+};
 
 export function availableEmbeddingModels(openAIKey: string): EmbeddingModel[] {
   return [
@@ -68,13 +68,15 @@ export class AnthropicClient {
 
   async createMessage(system_prompt: string, msgs: ChatMessage[], modelName?: string) {
     const model = modelName || this.defaultModel;
+    let formattedMessages: AnthropicChatMessage[];
+    formattedMessages = msgs.map(msg => ({
+      role: msg.role === 'user' ? 'user' : 'assistant',
+      content: msg.content
+    }));
     const msg = await this.anthropic.messages.create({
       model: model,
       max_tokens: 1024,
-      messages: msgs.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      } as AnthropicChatMessage)),
+      messages: formattedMessages,
       system: system_prompt,
     });
     return msg;

@@ -151,7 +151,25 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
     }
   };
 
-  const responseWithoutNoteTag = response.replace(/<note>([\s\S]*?)<\/note>/, '');
+  const responseComponents = response.split(/(<note>[\s\S]*?<\/note>)/).map((section, index) => {
+    if (section.startsWith('<note>')) {
+      const noteContent = section.replace(/<\/?note>/g, '');
+      return (
+        <div
+          key={index}
+          style={{
+            border: '1px solid var(--background-modifier-border)',
+            padding: '1em',
+            backgroundColor: 'var(--background-primary-alt)',
+            borderRadius: '8px'
+          }}
+        >
+          <ReactMarkdown>{noteContent}</ReactMarkdown>
+        </div>
+      );
+    }
+    return <ReactMarkdown key={index}>{section}</ReactMarkdown>;
+  });
 
   return (
     <div className={!isModelAvailable ? 'is-disabled' : ''}>
@@ -183,7 +201,7 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
           <button onClick={() => populateCopilotSuggest()}>Suggest Revisions</button><br />
           <hr />
           {isLoadingResponse && <span>Loading...</span>}<p></p>
-          <ReactMarkdown>{responseWithoutNoteTag}</ReactMarkdown>
+          <>{responseComponents}</>
         </>
       )}
     </div>
