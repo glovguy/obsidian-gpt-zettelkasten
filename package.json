@@ -1,7 +1,7 @@
 {
 	"name": "zettelkasten-llm-tools",
 	"version": "1.6.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Zettelkasten note taking powered by AI",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs --watch",
