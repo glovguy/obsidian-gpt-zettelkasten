@@ -127,10 +127,13 @@ const SemanticSearchTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, a
   }
   if (activeFileVector && searchResults.length > 0) {
     return (awaitingEmbeddingPrompt(
-        <SemanticSearchResults results={searchResults}
+        <SemanticSearchResults
+          results={searchResults}
           activeFileLinktext={activeFileVector.linktext}
           plugin={plugin}
-          noteLinkClickedCallback={undefined} />
+          noteLinkClickedCallback={undefined}
+          searchTab={this}
+        />
       )
     );
   }
