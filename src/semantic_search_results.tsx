@@ -39,28 +39,41 @@ const SemanticSearchResults = (
       <h1>Results</h1>
       <span>Notes similar to <b>{"[[" + activeFileLinktext + "]]"}</b></span><p />
       <span className="search-results-search-count-subheader" >Searched {plugin.vectorStore.numVectors()} entries</span><p /><p />
-      {results.slice(0, resultShowNum).map((result) => {
+      {results.filter(r => r.content && r.content.length > 0).slice(0, resultShowNum).map((result) => {
         if (!result.content) { return; }
-        const truncatedContent = result.content.slice(0, TRUNCATED_CONTENT_LENGTH);
-        const isTruncated = result.content.length > TRUNCATED_CONTENT_LENGTH;
         return (
-          <div key={result.storedVector.sha} className="search-result-container" >
-            <div>
-              <a className="search-result-linktext" onClick={() => onClickNoteLink(result)}>
-                {'[[' + result.storedVector.linktext + ']]'}
-              </a>
-              <button className="search-result-copy-button" onClick={() => copyToClipboard("[[" + result.storedVector.linktext + "]]")}><CopyIcon></CopyIcon></button>
+          <div
+            key={result.storedVector.sha}
+            className="search-result-container-border"
+            >
+            <div
+              ref={(el) => {
+                if (el) {
+                  // Need to wait for content to render before checking overflow
+                  setTimeout(() => {
+                    const hasOverflow = el.scrollHeight > el.clientHeight;
+                    el.classList.add(hasOverflow ? 'search-result-container-with-shadow' : 'search-result-container-without-shadow');
+                  }, 0);
+                }
+              }}
+              className="search-result-container"
+              >
+              <div>
+                <a className="search-result-linktext" onClick={() => onClickNoteLink(result)}>
+                  {'[[' + result.storedVector.linktext + ']]'}
+                </a>
+                <button className="search-result-copy-button" onClick={() => copyToClipboard("[[" + result.storedVector.linktext + "]]")}><CopyIcon></CopyIcon></button>
+              </div>
+              <div className="search-result-similarity-indicator">
+                Similarity: {result.similarity.toFixed(3)}
+              </div>
+              <NativeObsidianMarkdownComponent
+                app={plugin.app}
+                rawTextToRender={result.content}
+                filePathOfTheContent={result.storedVector.path}
+                view={searchTab as unknown as MarkdownView}
+              />
             </div>
-            <div style={{ marginLeft: '16px' }}>
-              Similarity: {result.similarity.toFixed(3)}
-            </div>
-            <NativeObsidianMarkdownComponent
-              app={plugin.app}
-              rawTextToRender={truncatedContent}
-              filePathOfTheContent={result.storedVector.path}
-              view={searchTab as unknown as MarkdownView}
-            />
-            {isTruncated && <p className="search-result-content">...</p>}
           </div>
         )
       })}
@@ -73,7 +86,6 @@ const SemanticSearchResults = (
 
 const NativeObsidianMarkdownComponent = ({ app, rawTextToRender, filePathOfTheContent, view }: { app: App, rawTextToRender: string, filePathOfTheContent: string, view: MarkdownView }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!containerRef.current) return;
 

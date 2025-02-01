@@ -20,13 +20,42 @@ If your plugin does not need CSS, delete this file.
   padding: 8px;
 }
 
-.search-result-container {
+.search-result-container-border {
   padding: 4px;
   padding-bottom: 8px;
   border: light-grey;
   margin: 4px;
   border-style: groove;
   border-radius: 8px;
+  max-height: 400px;
+}
+
+.search-result-container {
+  max-height: 392px; /* 400px - 8px (padding) */
+  overflow: hidden;
+  position: relative;
+  padding: 0px;
+}
+
+.search-result-container-with-shadow {
+  mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
+}
+
+.search-result-container-without-shadow {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.search-result-similarity-indicator {
+  margin-left: 20px;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.markdown-preview-view {
+  padding-top: 0px;
+  padding-bottom: 0px;
 }
 
 .search-results-show-more-container {
