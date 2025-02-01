@@ -132,7 +132,7 @@ const SemanticSearchTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, a
           activeFileLinktext={activeFileVector.linktext}
           plugin={plugin}
           noteLinkClickedCallback={undefined}
-          searchTab={this}
+          searchTab={this as unknown as SemanticSearchTab}
         />
       )
     );

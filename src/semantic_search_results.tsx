@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Notice, Component, MarkdownRenderer, App, MarkdownView, ItemView } from 'obsidian';
+import { Notice, MarkdownRenderer, App, MarkdownView, ItemView } from 'obsidian';
 import ZettelkastenLLMToolsPlugin from '../main';
 import { VectorSearchResult } from './vector_storage';
 import { CopyIcon } from './icon';
-import ReactMarkdown from 'react-markdown';
-
-const TRUNCATED_CONTENT_LENGTH = 400;
+import SemanticSearchTab from './semantic_search_tab';
+import SemanticSearchModal from './semantic_search_modal';
 
 const SemanticSearchResults = (
   {
@@ -19,7 +18,7 @@ const SemanticSearchResults = (
     plugin: ZettelkastenLLMToolsPlugin,
     activeFileLinktext: string,
     noteLinkClickedCallback?: () => void,
-    searchTab: ItemView,
+    searchTab: SemanticSearchTab | SemanticSearchModal,
   }) => {
   const [resultShowNum, setResultShowNum] = useState(5);
   const onClickNoteLink = (result: VectorSearchResult) => {
@@ -71,7 +70,7 @@ const SemanticSearchResults = (
                 app={plugin.app}
                 rawTextToRender={result.content}
                 filePathOfTheContent={result.storedVector.path}
-                view={searchTab as unknown as MarkdownView}
+                view={searchTab as unknown as ItemView}
               />
             </div>
           </div>
@@ -84,7 +83,17 @@ const SemanticSearchResults = (
   );
 };
 
-const NativeObsidianMarkdownComponent = ({ app, rawTextToRender, filePathOfTheContent, view }: { app: App, rawTextToRender: string, filePathOfTheContent: string, view: MarkdownView }) => {
+const NativeObsidianMarkdownComponent = ({
+  app,
+  rawTextToRender,
+  filePathOfTheContent,
+  view
+}: {
+  app: App,
+  rawTextToRender: string,
+  filePathOfTheContent: string,
+  view: ItemView
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!containerRef.current) return;
@@ -98,7 +107,7 @@ const NativeObsidianMarkdownComponent = ({ app, rawTextToRender, filePathOfTheCo
       filePathOfTheContent,
       view
     );
-  }, [rawTextToRender, filePathOfTheContent]);
+  }, []);
 
   return (
     <div className="markdown-preview-view" ref={containerRef} />

@@ -40,7 +40,8 @@ export default class SemanticSearchModal extends Modal {
       <SemanticSearchResults results={topMatches}
                      activeFileLinktext={activeFileVector.linktext}
                      plugin={this.plugin}
-                     noteLinkClickedCallback={this.close} />
+                     noteLinkClickedCallback={this.close}
+                     searchTab={this} />
     );
   }
 
