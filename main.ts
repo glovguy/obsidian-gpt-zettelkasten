@@ -19,7 +19,9 @@ import {
   availableEmbeddingModels,
   AnthropicClient,
   availableChatModels,
-  CLAUDE_3_5_HAIKU,
+  fetchAvailableChatModels,
+  ChatModel,
+  CLAUDE_HAIKU_4_5,
 } from './src/llm_client';
 import { generateAndStoreEmbeddings, FileFilter } from './src/semantic_search';
 import { VectorStore, StoredVector } from './src/vector_storage';
@@ -54,7 +56,7 @@ const DEFAULT_SETTINGS: ZettelkastenLLMToolsPluginSettings = {
   noteGroups: DEFAULT_NOTE_GROUPS.map(grp => ({ ...grp })), // deep copy
   embeddingsEnabled: false,
   indexedNoteGroup: 0,
-  copilotModel: CLAUDE_3_5_HAIKU,
+  copilotModel: CLAUDE_HAIKU_4_5,
 };
 
 export default class ZettelkastenLLMToolsPlugin extends Plugin {
@@ -456,43 +458,57 @@ class ZettelkastenLLMToolsPluginSettingTab extends PluginSettingTab {
     statusEl.style.borderRadius = '4px';
 
     let copilotModelSettingDropdown: DropdownComponent;
+
+    const populateCopilotModelDropdown = (dropdown: DropdownComponent, models: ChatModel[]) => {
+      while (dropdown.selectEl.options.length > 0) {
+        dropdown.selectEl.remove(0);
+      }
+      models.forEach(model => {
+        if (model.available) {
+          dropdown.addOption(model.name, model.displayName);
+        }
+      });
+      const savedModel = this.plugin.settings.copilotModel;
+      // Keep the saved model visible even when the provider no longer offers it (key
+      // removed, model retired), so the dropdown doesn't quietly show a different one.
+      if (savedModel && !models.some(model => model.available && model.name === savedModel)) {
+        dropdown.addOption(savedModel, `${savedModel} (unavailable)`);
+      }
+      dropdown.setValue(savedModel);
+    };
+
+    // Render the built-in list first so the dropdown is populated synchronously, then
+    // swap in the models the provider actually offers once the request comes back.
+    const refreshCopilotModelDropdown = (dropdown: DropdownComponent) => {
+      populateCopilotModelDropdown(dropdown, availableChatModels(
+        this.plugin.settings.openaiAPIKey,
+        this.plugin.settings.anthropicAPIKey
+      ));
+      fetchAvailableChatModels(
+        this.plugin.settings.openaiAPIKey,
+        this.plugin.settings.anthropicAPIKey
+      ).then(models => {
+        populateCopilotModelDropdown(dropdown, models);
+      }).catch(error => {
+        console.error('Could not refresh the copilot model list:', error);
+      });
+    };
+
     new Setting(containerEl)
       .setName('Copilot Model')
       .setDesc('Select which model to use for the AI Copilot')
       .addDropdown(dropdown => {
         copilotModelSettingDropdown = dropdown;
-        const availableModels = availableChatModels(
-          this.plugin.settings.openaiAPIKey,
-          this.plugin.settings.anthropicAPIKey
-        );
+        refreshCopilotModelDropdown(dropdown);
 
-        availableModels.forEach(model => {
-          if (model.available) {
-            dropdown.addOption(model.name, model.displayName);
-          }
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.copilotModel = value;
+          await this.plugin.saveSettings();
         });
-
-        dropdown.setValue(this.plugin.settings.copilotModel)
-          .onChange(async (value) => {
-            this.plugin.settings.copilotModel = value;
-            await this.plugin.saveSettings();
-          });
       });
 
     this.plugin.on('zettelkasten-llm-tools:api-keys-updated', () => {
-      const availableModels = availableChatModels(
-        this.plugin.settings.openaiAPIKey,
-        this.plugin.settings.anthropicAPIKey
-      );
-      while (copilotModelSettingDropdown.selectEl.options.length > 0) {
-        copilotModelSettingDropdown.selectEl.remove(0);
-      }
-      availableModels.forEach(model => {
-        if (model.available) {
-          copilotModelSettingDropdown.addOption(model.name, model.displayName);
-        }
-      });
-      copilotModelSettingDropdown.setValue(this.plugin.settings.copilotModel);
+      refreshCopilotModelDropdown(copilotModelSettingDropdown);
     });
 
     this.plugin.settings.noteGroups.forEach((noteGroup, i) => {
