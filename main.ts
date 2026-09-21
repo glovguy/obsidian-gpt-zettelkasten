@@ -66,11 +66,27 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   fileFilter: FileFilter;
   copilotTab: CopilotTab;
   semanticSearchTab: SemanticSearchTab;
-  openaiClient: OpenAIClient;
-  anthropicClient: AnthropicClient;
+  private _openaiClient: OpenAIClient | null = null;
+  private _anthropicClient: AnthropicClient | null = null;
   indexingStatus: typeof IDLE_STATUS | typeof INDEXING_STATUS;
   lastIndexedCount: number;
   private events: Events;
+
+  // Constructed on first use so a caller that reaches for a client before
+  // loadSettings() has run gets a usable (keyless) client rather than undefined.
+  get openaiClient(): OpenAIClient {
+    if (!this._openaiClient) {
+      this._openaiClient = new OpenAIClient(this.settings?.openaiAPIKey || '');
+    }
+    return this._openaiClient;
+  }
+
+  get anthropicClient(): AnthropicClient {
+    if (!this._anthropicClient) {
+      this._anthropicClient = new AnthropicClient(this.settings?.anthropicAPIKey || '');
+    }
+    return this._anthropicClient;
+  }
 
   async onload() {
     this.events = new Events();
@@ -206,8 +222,8 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
 
     // this.indexVectorStores();
 
-    this.openaiClient = new OpenAIClient(this.settings.openaiAPIKey);
-    this.anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
+    this._openaiClient = new OpenAIClient(this.settings.openaiAPIKey);
+    this._anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
   }
 
   clearVectorArray() {
@@ -219,8 +235,8 @@ export default class ZettelkastenLLMToolsPlugin extends Plugin {
   async saveSettings() {
     console.log('saving...');
     await this.saveData(this.settings);
-    this.openaiClient = new OpenAIClient(this.settings.openaiAPIKey);
-    this.anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
+    this._openaiClient = new OpenAIClient(this.settings.openaiAPIKey);
+    this._anthropicClient = new AnthropicClient(this.settings.anthropicAPIKey);
     console.log('done');
   }
 
