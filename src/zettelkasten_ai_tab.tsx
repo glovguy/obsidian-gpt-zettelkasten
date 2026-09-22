@@ -8,7 +8,14 @@ import { NoteGroup } from './note_group';
 import { VIEW_TYPE_AI_COPILOT } from './constants';
 import { App } from 'obsidian';
 import { useState, useEffect } from 'react';
-import { availableChatModels, ChatMessage, ChatModel } from './llm_client';
+import {
+  availableChatModels,
+  fetchAvailableChatModels,
+  providerForModel,
+  OPENAI_PROVIDER,
+  ChatMessage,
+  ChatModel,
+} from './llm_client';
 
 
 const DEFAULT_SYSTEM_PROMPT = 'The following is a Zettelkasten note written by the user. The note should have 1. a clear title, 2. a single, clear thought stated briefly, 3. links to relevant ideas.\nSuggest revisions for this note. Be very brief and concise. Imitate their writing style. If you show an example of the suggested edits, wrap them in a <note></note> tag. If you want to suggest splitting into multiple notes, use more than one <note></note> tag.';
@@ -95,10 +102,20 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
   }, [activeFile, app.workspace]);
 
   useEffect(() => {
+    let cancelled = false;
+    // Show the built-in list immediately so the dropdown is never empty, then replace
+    // it with whatever the provider actually offers this key.
     setAvailableModels(availableChatModels(
       plugin.settings.openaiAPIKey,
       plugin.settings.anthropicAPIKey
     ));
+    fetchAvailableChatModels(
+      plugin.settings.openaiAPIKey,
+      plugin.settings.anthropicAPIKey
+    ).then(models => {
+      if (!cancelled) { setAvailableModels(models); }
+    });
+    return () => { cancelled = true; };
   }, [plugin.settings.openaiAPIKey, plugin.settings.anthropicAPIKey]);
 
   const isModelAvailable = availableModels.some(model =>
@@ -128,7 +145,7 @@ const CopilotTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, app: App
       const selectedModel = plugin.settings.copilotModel;
       let response;
 
-      if (selectedModel.startsWith('gpt')) {
+      if (providerForModel(selectedModel, availableModels) === OPENAI_PROVIDER) {
         response = await plugin.openaiClient.createMessage(
           system_prompt,
           [userMessage],

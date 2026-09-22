@@ -52,12 +52,13 @@ const defaultOpenAIConfig: OpenAIClientConfig = {
   quantization_decimals: quantizationDecimals,
 };
 
-export const CLAUDE_3_5_SONNET = 'claude-3-5-sonnet-latest';
-export const CLAUDE_3_5_HAIKU = 'claude-3-5-haiku-latest';
+export const CLAUDE_OPUS_5 = 'claude-opus-5';
+export const CLAUDE_SONNET_5 = 'claude-sonnet-5';
+export const CLAUDE_HAIKU_4_5 = 'claude-haiku-4-5';
 
 export class AnthropicClient {
   anthropic: Anthropic;
-  defaultModel = CLAUDE_3_5_SONNET;
+  defaultModel = CLAUDE_HAIKU_4_5;
 
   constructor(apiKey: string) {
     this.anthropic = new Anthropic({
@@ -162,12 +163,12 @@ export async function generateEmbeddings(
 export const OPENAI_GPT4o = 'gpt-4o';
 export const OPENAI_GPT4o_MINI = 'gpt-4o-mini';
 export const OPENAI_GPT35 = 'gpt-3.5-turbo';
-export type ChatModelNames =
-  | typeof OPENAI_GPT4o
-  | typeof OPENAI_GPT4o_MINI
-  | typeof OPENAI_GPT35
-  | typeof CLAUDE_3_5_SONNET
-  | typeof CLAUDE_3_5_HAIKU;
+
+// Model ids are plain strings rather than a closed union: both providers add models
+// far more often than this plugin ships, and the dropdown is populated from their
+// /models endpoints at runtime. The constants above and the hardcoded lists below
+// exist only as a fallback for when those endpoints can't be reached.
+export type ChatModelNames = string;
 
 export interface ChatModel {
   provider: typeof OPENAI_PROVIDER | typeof ANTHROPIC_PROVIDER;
@@ -176,37 +177,140 @@ export interface ChatModel {
   available: boolean;
 }
 
-export function availableChatModels(openAIKey: string, anthropicKey: string): ChatModel[] {
+function openAIFallbackModels(openAIKey: string): ChatModel[] {
   return [
     {
       provider: OPENAI_PROVIDER,
       name: OPENAI_GPT4o,
-      displayName: 'GPT-4o',
+      displayName: 'OpenAI: GPT-4o',
       available: !!openAIKey,
     },
     {
       provider: OPENAI_PROVIDER,
       name: OPENAI_GPT4o_MINI,
-      displayName: 'GPT-4o Mini',
+      displayName: 'OpenAI: GPT-4o Mini',
       available: !!openAIKey,
     },
     {
       provider: OPENAI_PROVIDER,
       name: OPENAI_GPT35,
-      displayName: 'GPT-3.5 Turbo',
+      displayName: 'OpenAI: GPT-3.5 Turbo',
       available: !!openAIKey,
     },
+  ];
+}
+
+function anthropicFallbackModels(anthropicKey: string): ChatModel[] {
+  return [
     {
       provider: ANTHROPIC_PROVIDER,
-      name: CLAUDE_3_5_SONNET,
-      displayName: 'Claude 3.5 Sonnet',
+      name: CLAUDE_OPUS_5,
+      displayName: 'Anthropic: Claude Opus 5',
       available: !!anthropicKey,
     },
     {
       provider: ANTHROPIC_PROVIDER,
-      name: CLAUDE_3_5_HAIKU,
-      displayName: 'Claude 3.5 Haiku',
+      name: CLAUDE_SONNET_5,
+      displayName: 'Anthropic: Claude Sonnet 5',
+      available: !!anthropicKey,
+    },
+    {
+      provider: ANTHROPIC_PROVIDER,
+      name: CLAUDE_HAIKU_4_5,
+      displayName: 'Anthropic: Claude Haiku 4.5',
       available: !!anthropicKey,
     },
   ];
+}
+
+// Synchronous fallback list, used when a provider's /models endpoint is unreachable
+// (offline, proxy, revoked key). Prefer fetchAvailableChatModels.
+export function availableChatModels(openAIKey: string, anthropicKey: string): ChatModel[] {
+  return [
+    ...openAIFallbackModels(openAIKey),
+    ...anthropicFallbackModels(anthropicKey),
+  ];
+}
+
+// OpenAI's /models lists everything the key can touch, including embeddings, audio
+// and moderation endpoints. Keep the families that can serve a chat completion.
+const OPENAI_CHAT_MODEL_PREFIXES = ['gpt-', 'ft:gpt-', 'o1', 'o3', 'o4', 'chatgpt-'];
+const OPENAI_NON_CHAT_MARKERS = [
+  'instruct', 'realtime', 'audio', 'transcribe', 'tts', 'whisper',
+  'embedding', 'moderation', 'dall-e', 'image', 'search', 'computer-use',
+];
+
+function isOpenAIChatModel(modelId: string): boolean {
+  if (!modelId) { return false; }
+  const matchesPrefix = OPENAI_CHAT_MODEL_PREFIXES.some(prefix => modelId.startsWith(prefix));
+  const matchesNonChat = OPENAI_NON_CHAT_MARKERS.some(marker => modelId.includes(marker));
+  return matchesPrefix && !matchesNonChat;
+}
+
+async function fetchOpenAIModels(openAIKey: string): Promise<ChatModel[]> {
+  if (!openAIKey) { return []; }
+
+  const openai = new OpenAI({
+    apiKey: openAIKey,
+    dangerouslyAllowBrowser: true, // for obsidian, all API keys are provided by the user
+  });
+
+  const response = await openai.models.list();
+  return (response.data || [])
+    .filter(model => isOpenAIChatModel(model.id))
+    .sort((a, b) => (b.created || 0) - (a.created || 0))
+    .map(model => ({
+      provider: OPENAI_PROVIDER,
+      name: model.id,
+      displayName: `OpenAI: ${model.id}`,
+      available: true,
+    }));
+}
+
+async function fetchAnthropicModels(anthropicKey: string): Promise<ChatModel[]> {
+  if (!anthropicKey) { return []; }
+
+  const anthropic = new Anthropic({
+    apiKey: anthropicKey,
+    dangerouslyAllowBrowser: true, // for obsidian, all API keys are provided by the user
+  });
+
+  // Returned newest-first; every model the Messages API lists can chat.
+  const response = await anthropic.models.list({ limit: 100 });
+  return response.data.map(model => ({
+    provider: ANTHROPIC_PROVIDER,
+    name: model.id,
+    displayName: `Anthropic: ${model.display_name || model.id}`,
+    available: true,
+  }));
+}
+
+// Asks each provider which models the user's key can actually reach, so the dropdown
+// keeps up with new releases without a plugin update. A provider that errors falls
+// back to its hardcoded list rather than dropping out of the dropdown entirely.
+export async function fetchAvailableChatModels(
+  openAIKey: string,
+  anthropicKey: string
+): Promise<ChatModel[]> {
+  const [openAIModels, anthropicModels] = await Promise.all([
+    fetchOpenAIModels(openAIKey).catch(error => {
+      console.error('Could not list OpenAI models, falling back to built-in list:', error);
+      return openAIFallbackModels(openAIKey);
+    }),
+    fetchAnthropicModels(anthropicKey).catch(error => {
+      console.error('Could not list Anthropic models, falling back to built-in list:', error);
+      return anthropicFallbackModels(anthropicKey);
+    }),
+  ]);
+
+  return [...openAIModels, ...anthropicModels];
+}
+
+// The dropdown offers models from both providers, so the send path has to dispatch on
+// the model's provider. Matching on the id prefix silently sent o-series and fine-tuned
+// OpenAI models to the Anthropic client.
+export function providerForModel(modelName: string, models: ChatModel[]): typeof OPENAI_PROVIDER | typeof ANTHROPIC_PROVIDER {
+  const known = models.find(model => model.name === modelName);
+  if (known) { return known.provider; }
+  return isOpenAIChatModel(modelName) ? OPENAI_PROVIDER : ANTHROPIC_PROVIDER;
 }
