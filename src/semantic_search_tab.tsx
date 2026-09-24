@@ -44,7 +44,7 @@ export default class SemanticSearchTab extends ItemView {
     this.render();
   }
 
-  renderSelectedView(): JSX.Element {
+  renderSelectedView(): React.JSX.Element {
     const viewToRender = SemanticSearchTabContent;
     return React.createElement(viewToRender, { plugin: this.plugin, app: this.app });
   }
@@ -67,7 +67,7 @@ const SemanticSearchTabContent: React.FC<{ plugin: ZettelkastenLLMToolsPlugin, a
   const [activeFileVector, setActiveFileVector] = useState<StoredVector | null>(null);
   const [errorGeneratingEmbedding, setErrorGeneratingEmbedding] = useState<boolean>(false);
 
-  const awaitingEmbeddingPrompt = (BodyComponent: JSX.Element): JSX.Element => {
+  const awaitingEmbeddingPrompt = (BodyComponent: React.JSX.Element): React.JSX.Element => {
     return (
       <div>
         <h1>Semantic Search</h1>
