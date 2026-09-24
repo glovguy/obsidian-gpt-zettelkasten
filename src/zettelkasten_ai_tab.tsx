@@ -52,7 +52,7 @@ export default class CopilotTab extends ItemView {
     this.render();
   }
 
-  renderSelectedView(): JSX.Element {
+  renderSelectedView(): React.JSX.Element {
     const viewToRender = CopilotTabContent;
     return React.createElement(viewToRender, { plugin: this.plugin, app: this.app });
   }
