@@ -1,9 +1,8 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { MessageParam } from '@anthropic-ai/sdk/resources';
-import type { ChatCompletionMessageParam } from 'openai/resources';
+import type { ResponseInput } from 'openai/resources/responses/responses';
 
-type OpenAIChatMessage = ChatCompletionMessageParam;
 type AnthropicChatMessage = MessageParam;
 
 export interface OpenAIClientConfig {
@@ -104,22 +103,31 @@ export class OpenAIClient {
   async createMessage(system_prompt: string, msgs: ChatMessage[], modelName?: string) {
     const model = modelName || OPENAI_GPT4o_MINI;
 
-    // Convert messages to OpenAI format
-    const formattedMessages: OpenAIChatMessage[] = [
-      { role: 'system', content: system_prompt },
-      ...msgs.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      } as OpenAIChatMessage))
-    ];
+    // The Responses API takes the system prompt as `instructions` and the conversation
+    // as input items, so each turn keeps its own role.
+    const input: ResponseInput = msgs.map(msg => ({
+      role: msg.role,
+      content: msg.content,
+    }));
 
-    const response = await this.openai.chat.completions.create({
+    // max_output_tokens is deliberately unset: the cap that would suit gpt-4o-mini is
+    // below what a reasoning model spends before it emits any text, and the ceiling
+    // differs per model (gpt-3.5-turbo caps at 4k). Copilot replies are short anyway.
+    const response = await this.openai.responses.create({
       model: model,
-      messages: formattedMessages,
-      max_tokens: 1024,
+      instructions: system_prompt,
+      input,
     });
 
-    return response.choices[0].message.content || '';
+    if (response.status === 'incomplete') {
+      const reason = response.incomplete_details?.reason ?? 'unknown reason';
+      if (response.output_text) {
+        return `${response.output_text}\n\n[Response was cut off: ${reason}]`;
+      }
+      throw new Error(`OpenAI returned an incomplete response (${reason}) with no text.`);
+    }
+
+    return response.output_text;
   }
 
   async generateOpenAiEmbeddings(docs: Array<string>) {
